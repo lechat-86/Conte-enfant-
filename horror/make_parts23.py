@@ -343,6 +343,9 @@ def main():
     tag = "_voix" if voice else ""
     base = os.path.join(HERE, "partie%d" % part)
     render(base + "_sans_soustitres%s.mp4" % tag, wav, scenes, {}, dur, voice)
+    import json
+    with open(base + "_captions.json", "w", encoding="utf-8") as f:
+        json.dump(captions_for(segs, starts, vend), f, ensure_ascii=False)
     caps = {(s, e, t): make_caption(t) for s, e, t in captions_for(segs, starts, vend)}
     render(base + "_avec_soustitres%s.mp4" % tag, wav, scenes, caps, dur, voice)
     os.remove(wav)
