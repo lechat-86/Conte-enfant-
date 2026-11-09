@@ -224,7 +224,7 @@ def finish(amb, dur, extra=None):
     if extra is not None:
         L = L + extra; R = R + np.roll(extra, 18)
     pcm = (np.clip(np.stack([L, R], 1), -1, 1) * 32767).astype("<i2")
-    path = os.path.join(mv.HERE, "audio_tmp23.wav")
+    path = os.path.join(mv.HERE, "audio_tmp23_%d.wav" % os.getpid())
     with wave.open(path, "wb") as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes(pcm.tobytes())
