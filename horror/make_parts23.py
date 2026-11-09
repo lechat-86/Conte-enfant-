@@ -84,6 +84,54 @@ def auto_starts(voice, segs):
 def setup(dur):
     mv.DUR = dur; mv.N = int(dur * SR); mv.TT = np.arange(mv.N) / SR
 
+def fractal(h, w, seed):
+    r = np.random.default_rng(seed)
+    out = np.zeros((h, w), np.float32)
+    for sc_, amp in [(3, .45), (9, .32), (30, .23)]:
+        n = r.random((h // sc_ + 2, w // sc_ + 2)).astype(np.float32)
+        im = Image.fromarray((n * 255).astype(np.uint8)).resize((w, h), Image.BICUBIC)
+        out += amp * (np.asarray(im, np.float32) / 255 - 0.5)
+    return out
+
+def enhance(img, seed, texture=True):
+    """Upscale x2 (Lanczos) + netteté + texture fine fixe (pierre, bois, papier) pour des décors moins plats."""
+    big = img.resize((img.width * 2, img.height * 2), Image.LANCZOS).filter(ImageFilter.UnsharpMask(2, 70, 3))
+    if not texture:
+        return big
+    a = np.asarray(big, np.float32)
+    t = fractal(big.height, big.width, seed)[..., None]
+    a = a * (1 + 0.42 * t) + 7 * t
+    return Image.fromarray(a.clip(0, 255).astype(np.uint8))
+
+def photos_hd():
+    """Scène des photos redessinée en x4 pour rester nette malgré le zoom."""
+    base = mv.scene_photos()
+    big = base.resize((base.width * 4, base.height * 4), Image.LANCZOS).filter(ImageFilter.UnsharpMask(3, 60, 3))
+    a = np.asarray(big, np.float32)
+    t = fractal(big.height, big.width, 99)[..., None]
+    big = Image.fromarray((a * (1 + 0.35 * t) + 6 * t).clip(0, 255).astype(np.uint8))
+    del a, t
+    for i, (x, y) in enumerate([(95, 150), (430, 150), (765, 150)]):
+        canvas = Image.new("RGB", (1040, 1400))
+        mv._photo(canvas, 0, 0, 1040, 1400, i, S=4)
+        big.paste(canvas, (x * 4, y * 4))
+    return big
+
+def hd_scenes(scenes):
+    cache, keep = {}, []
+    for sc in scenes:
+        tex = sc["name"] not in ("title", "end", "black", "scream", "card1", "card2", "card3")
+        for st in sc["stages"]:
+            k = id(st["img"])
+            if k not in cache:
+                keep.append(st["img"])
+                cache[k] = photos_hd() if sc["name"] == "photos" else enhance(st["img"], len(cache) + 1, tex)
+            f = cache[k].width / 1120.0
+            st["img"] = cache[k]
+            st["focus"] = (st["focus"][0] * f, st["focus"][1] * f)
+    mv.PW, mv.PH = 2240, 1260
+    mv.set_resolution(1920, 1080)
+
 def captions_for(segs, starts, vend):
     out = []
     for i, s in enumerate(segs):
@@ -309,14 +357,15 @@ def build_audio(part, starts, vend, dur, info):
 
 # ---------------------------------------------------------------- rendu
 def render(out, wav, scenes, caps, dur, voice=None):
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H),
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (mv.W, mv.H),
            "-r", str(FPS), "-i", "-", "-i", wav]
     if voice:
         d = int(DELAY * 1000)
         cmd += ["-i", voice, "-filter_complex",
                 "[1:a]volume=0.55[a];[2:a]adelay=%d|%d[v];[a][v]amix=inputs=2:normalize=0:duration=longest[o]" % (d, d),
                 "-map", "0:v", "-map", "[o]"]
-    cmd += ["-t", "%.3f" % dur, "-c:v", "libx264", "-preset", "medium", "-crf", "30", "-pix_fmt", "yuv420p",
+    cmd += ["-t", "%.3f" % dur, "-c:v", "libx264", "-preset", "medium", "-crf", "30" if mv.W < 1920 else "19",
+           "-maxrate", "14M", "-bufsize", "28M", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out]
     pr = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     for fi in range(int(dur * FPS)):
@@ -339,15 +388,21 @@ def main():
     print("débuts de segments (s, dans l'audio):", [round(x, 2) for x in starts], "fin parole:", round(vend, 2), flush=True)
     scenes, dur, info = build_scenes(part, starts, vend)
     setup(dur)
+    hd = "--hd" in a
+    only = a[a.index("--only") + 1] if "--only" in a else "both"
+    if hd:
+        hd_scenes(scenes)
     wav = build_audio(part, starts, vend, dur, info)
-    tag = "_voix" if voice else ""
+    tag = ("_voix" if voice else "") + ("_hd" if hd else "")
     base = os.path.join(HERE, "partie%d" % part)
-    render(base + "_sans_soustitres%s.mp4" % tag, wav, scenes, {}, dur, voice)
+    if only in ("both", "clean"):
+        render(base + "_sans_soustitres%s.mp4" % tag, wav, scenes, {}, dur, voice)
     import json
     with open(base + "_captions.json", "w", encoding="utf-8") as f:
         json.dump(captions_for(segs, starts, vend), f, ensure_ascii=False)
     caps = {(s, e, t): make_caption(t) for s, e, t in captions_for(segs, starts, vend)}
-    render(base + "_avec_soustitres%s.mp4" % tag, wav, scenes, caps, dur, voice)
+    if only in ("both", "subs"):
+        render(base + "_avec_soustitres%s.mp4" % tag, wav, scenes, caps, dur, voice)
     os.remove(wav)
 
 if __name__ == "__main__":

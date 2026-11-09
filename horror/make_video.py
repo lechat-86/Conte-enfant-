@@ -339,7 +339,7 @@ def _people(d, x, y, sc, col=(18, 14, 12), skin=(185, 170, 150)):
         d.rounded_rectangle([px - ww * sc, y - hh * sc, px + ww * sc, y], radius=int(10 * sc), fill=col)
         d.ellipse([px - 15 * sc, y - hh * sc - 30 * sc, px + 15 * sc, y - hh * sc], fill=skin)
 
-def _photo(img, x, y, w, h, kind):
+def _photo(img, x, y, w, h, kind, S=1):
     ph = vgrad((150, 128, 96), (84, 70, 50), w, h)
     pd = ImageDraw.Draw(ph)
     pd.rectangle([0, int(h * 0.62), w, h], fill=(64, 56, 40))
@@ -347,11 +347,11 @@ def _photo(img, x, y, w, h, kind):
     pd.polygon([(int(w * 0.12), int(h * 0.32)), (int(w * 0.5), int(h * 0.12)), (int(w * 0.88), int(h * 0.32))], fill=(52, 44, 34))
     pd.rectangle([int(w * 0.44), int(h * 0.46), int(w * 0.56), int(h * 0.64)], fill=(26, 20, 14))
     if kind == 0:
-        _people(pd, w * 0.5, h * 0.92, 0.9)
+        _people(pd, w * 0.5, h * 0.92, 0.9 * S)
         pd.rectangle([int(w * 0.88), int(h * 0.5), int(w * 0.9), int(h * 0.64)], fill=(8, 8, 8))
         pd.ellipse([int(w * 0.875), int(h * 0.47), int(w * 0.915), int(h * 0.51)], fill=(8, 8, 8))
     elif kind == 1:
-        _people(pd, w * 0.52, h * 0.93, 1.0)
+        _people(pd, w * 0.52, h * 0.93, 1.0 * S)
         pd.rectangle([int(w * 0.46), int(h * 0.40), int(w * 0.54), int(h * 0.64)], fill=(5, 5, 6))
         pd.ellipse([int(w * 0.46), int(h * 0.33), int(w * 0.54), int(h * 0.43)], fill=(215, 212, 200))
         pd.ellipse([int(w * 0.48), int(h * 0.36), int(w * 0.5), int(h * 0.38)], fill=(0, 0, 0))
@@ -362,7 +362,7 @@ def _photo(img, x, y, w, h, kind):
         tmp = Image.new("RGB", (w, h), (0, 0, 0))
         tmp.paste(ph)
         figure(tmp, w * 0.5, h * 1.25, h * 1.15, face=True, col=(4, 4, 6))
-        girl(tmp, w * 0.5, h * 0.62, 38, 3)
+        girl(tmp, w * 0.5, h * 0.62, 38 * S, 3)
         ph = tmp
     ph = ImageEnhance_sepia(ph, kind)
     img.paste(ph, (x, y))
@@ -632,16 +632,26 @@ def wrap(text, f, maxw):
     return lines + [cur]
 
 CAP_H = 170
+def set_resolution(w, h):
+    """Passe le rendu en haute définition (sous-titres, HUD, bruit, vignette suivent)."""
+    global W, H, NOISE
+    W, H = w, h
+    NOISE = RNG.normal(0, 1, (8, H, W)).astype(np.float32)
+    _vig_cache.clear(); _hud_cache.clear()
+
 def make_caption(text):
-    f = font(27, italic=True)
-    lines = wrap(text, f, W - 150)
-    im = Image.new("RGBA", (W, CAP_H), (0, 0, 0, 0))
+    k = W / 960.0
+    f = font(int(27 * k), italic=True)
+    ch = int(CAP_H * k)
+    lines = wrap(text, f, W - 150 * k)
+    im = Image.new("RGBA", (W, ch), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    lh = 37
-    y = CAP_H - 22 - lh * len(lines)
-    d.rectangle([0, y - 14, W, CAP_H], fill=(0, 0, 0, 120))
+    lh = int(37 * k)
+    y = ch - int(22 * k) - lh * len(lines)
+    d.rectangle([0, y - int(14 * k), W, ch], fill=(0, 0, 0, 120))
     for i, ln in enumerate(lines):
-        d.text((W / 2, y + i * lh), ln, font=f, fill=(238, 232, 222, 255), anchor="ma", stroke_width=2, stroke_fill=(0, 0, 0, 255))
+        d.text((W / 2, y + i * lh), ln, font=f, fill=(238, 232, 222, 255), anchor="ma",
+               stroke_width=max(2, int(2 * k)), stroke_fill=(0, 0, 0, 255))
     a = np.asarray(im, np.float32)
     return a[..., :3], a[..., 3:4] / 255.0
 
@@ -651,28 +661,31 @@ def hud(t, t0):
     blink = int(t * 1.6) % 2
     key = (sec, blink)
     if key not in _hud_cache:
+        k = W / 960.0
         im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         d = ImageDraw.Draw(im)
-        f = font(20, sans=True)
+        f = font(int(20 * k), sans=True)
         if blink:
-            d.ellipse([34, 30, 52, 48], fill=(235, 30, 30, 255))
-        d.text((62, 38), "REC", font=f, fill=(235, 235, 235, 255), anchor="lm")
-        d.text((W - 34, 38), "00:%02d:%02d" % (sec // 60, sec % 60), font=f, fill=(235, 235, 235, 255), anchor="rm")
-        d.text((W - 34, 66), "▮▮▯", font=f, fill=(235, 235, 235, 200), anchor="rm")
-        for (x, y, sx, sy) in [(24, 20, 1, 1), (W - 24, 20, -1, 1), (24, H - 20, 1, -1), (W - 24, H - 20, -1, -1)]:
-            d.line([x, y, x + sx * 34, y], fill=(235, 235, 235, 220), width=3)
-            d.line([x, y, x, y + sy * 34], fill=(235, 235, 235, 220), width=3)
-        d.text((W / 2, H - 36), "NIGHT  ISO 6400", font=font(16, sans=True), fill=(235, 235, 235, 160), anchor="mm")
+            d.ellipse([34 * k, 30 * k, 52 * k, 48 * k], fill=(235, 30, 30, 255))
+        d.text((62 * k, 38 * k), "REC", font=f, fill=(235, 235, 235, 255), anchor="lm")
+        d.text((W - 34 * k, 38 * k), "00:%02d:%02d" % (sec // 60, sec % 60), font=f, fill=(235, 235, 235, 255), anchor="rm")
+        d.text((W - 34 * k, 66 * k), "▮▮▯", font=f, fill=(235, 235, 235, 200), anchor="rm")
+        for (x, y, sx, sy) in [(24 * k, 20 * k, 1, 1), (W - 24 * k, 20 * k, -1, 1), (24 * k, H - 20 * k, 1, -1), (W - 24 * k, H - 20 * k, -1, -1)]:
+            d.line([x, y, x + sx * 34 * k, y], fill=(235, 235, 235, 220), width=int(3 * k))
+            d.line([x, y, x, y + sy * 34 * k], fill=(235, 235, 235, 220), width=int(3 * k))
+        d.text((W / 2, H - 36 * k), "NIGHT  ISO 6400", font=font(int(16 * k), sans=True), fill=(235, 235, 235, 160), anchor="mm")
         a = np.asarray(im, np.float32)
         _hud_cache[key] = (a[..., :3], a[..., 3:4] / 255.0)
     return _hud_cache[key]
 
-def crop_box(focus, zoom, t, sway=1.0):
-    bw, bh = PW / zoom, PH / zoom
-    fx = focus[0] + math.sin(t * 0.9) * 7 * sway
-    fy = focus[1] + math.cos(t * 0.7) * 5 * sway
-    x0 = min(max(fx - bw / 2, 0), PW - bw)
-    y0 = min(max(fy - bh / 2, 0), PH - bh)
+def crop_box(focus, zoom, t, sway=1.0, size=None):
+    pw, ph = size or (PW, PH)
+    k = pw / 1120.0
+    bw, bh = pw / zoom, ph / zoom
+    fx = focus[0] + math.sin(t * 0.9) * 7 * sway * k
+    fy = focus[1] + math.cos(t * 0.7) * 5 * sway * k
+    x0 = min(max(fx - bw / 2, 0), pw - bw)
+    y0 = min(max(fy - bh / 2, 0), ph - bh)
     return (x0, y0, x0 + bw, y0 + bh)
 
 def render_frame(fi, scenes, caps):
@@ -692,11 +705,11 @@ def render_frame(fi, scenes, caps):
         zoom = 1.05 + 0.95 * (1 - math.exp(-k * 5.0)) + 0.15 * k
         amp = 30 * math.exp(-k * 0.8) + 6
         focus = (PW / 2 + rf.uniform(-amp, amp) * 3, PH * 0.52 + rf.uniform(-amp, amp) * 2)
-        box = crop_box(focus, zoom, t, 0)
+        box = crop_box(focus, zoom, t, 0, s["img"].size)
     else:
         zoom = s["z0"] + (s["z1"] - s["z0"]) * p
-        box = crop_box(s["focus"], zoom, t)
-    arr = np.asarray(s["img"].resize((W, H), Image.BILINEAR, box=box), np.float32)
+        box = crop_box(s["focus"], zoom, t, 1.0, s["img"].size)
+    arr = np.asarray(s["img"].resize((W, H), Image.BICUBIC, box=box), np.float32)
 
     mult = 1.0
     if sc["flick"]:
@@ -734,8 +747,9 @@ def render_frame(fi, scenes, caps):
         if c0 <= t < c1:
             col, a = caps[(c0, c1, text)]
             fade = min(1, (t - c0) / 0.3, (c1 - t) / 0.3)
-            reg = arr[H - CAP_H:]
-            arr[H - CAP_H:] = reg * (1 - a * fade) + col * (a * fade)
+            ch = col.shape[0]
+            reg = arr[H - ch:]
+            arr[H - ch:] = reg * (1 - a * fade) + col * (a * fade)
     if sc.get("hud"):
         col, a = hud(t, sc["t0"])
         arr = arr * (1 - a) + col * a
