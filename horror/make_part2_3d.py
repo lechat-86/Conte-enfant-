@@ -61,7 +61,7 @@ def main():
     anchors = dict(t0=DELAY, a2=a(2), a3=a(3), a4=a(4), a5=a(5), a6=a(6), a7=a(7), a8=a(8), ve=ve)
     t3d_end = ve + 0.8
     dur = t3d_end + 4.0
-    f0, f1 = int(DELAY * FPS), int(t3d_end * FPS)
+    f0, f1 = int(DELAY * FPS), int(t3d_end * FPS) + 1
     print("débuts de segments:", [round(x, 2) for x in starts], "fin parole:", round(vend, 2), "durée vidéo:", round(dur, 2), flush=True)
     framedir = os.path.join(HERE, "3d", "frames")
     if "--reuse" not in ARGV:
