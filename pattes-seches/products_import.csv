@@ -1,0 +1,18 @@
+Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Grams,Variant Inventory Tracker,Variant Inventory Policy,Variant Fulfillment Service,Variant Price,Variant Requires Shipping,Variant Taxable,SEO Title,SEO Description,Status
+manteau-impermeable-chien,"Manteau imperméable pour chien – Doublé polaire, réfléchissant","<p><strong>Fini les promenades sous la pluie qui finissent en inondation dans l'entrée.</strong></p>
+<p>Le manteau Pattes Sèches garde le dos et le ventre de votre chien au sec, même sous une pluie battante, et le tient au chaud grâce à sa doublure polaire légère.</p>
+<ul>
+<li><strong>Imperméable</strong> : tissu déperlant, dos et ventre protégés</li>
+<li><strong>Doublure polaire douce</strong> : chaud sans être encombrant</li>
+<li><strong>Bandes réfléchissantes</strong> : plus visible le soir en hiver</li>
+<li><strong>Ouverture pour harnais</strong> : passage de laisse prévu sur le dos</li>
+<li><strong>Fermetures réglables</strong> : s'ajuste au torse et au cou</li>
+<li><strong>Lavable</strong> : à 30 °C, séchage à l'air</li>
+</ul>
+<p><strong>Quelle taille choisir ?</strong> Mesurez la longueur du dos (du cou à la base de la queue) et le tour de poitrine, puis reportez-vous au tableau de tailles. En cas de doute, prenez la taille au-dessus.</p>
+<p>Livraison en 3 à 7 jours ouvrés depuis l'Europe. Retours acceptés sous 14 jours.</p>",Pattes Sèches,Manteau pour chien,"chien, manteau, imperméable, hiver, pluie",FALSE,Taille,XS,PS-MANTEAU-XS,200,,deny,manual,34.90,TRUE,TRUE,Manteau imperméable pour chien doublé polaire | Pattes Sèches,"Manteau imperméable doublé polaire pour chien, avec bandes réfléchissantes. Livraison depuis l'Europe, retours sous 14 jours.",draft
+manteau-impermeable-chien,,,,,,,Taille,S,PS-MANTEAU-S,200,,deny,manual,34.90,TRUE,TRUE,,,
+manteau-impermeable-chien,,,,,,,Taille,M,PS-MANTEAU-M,200,,deny,manual,34.90,TRUE,TRUE,,,
+manteau-impermeable-chien,,,,,,,Taille,L,PS-MANTEAU-L,200,,deny,manual,34.90,TRUE,TRUE,,,
+manteau-impermeable-chien,,,,,,,Taille,XL,PS-MANTEAU-XL,200,,deny,manual,34.90,TRUE,TRUE,,,
+manteau-impermeable-chien,,,,,,,Taille,2XL,PS-MANTEAU-2XL,200,,deny,manual,34.90,TRUE,TRUE,,,
