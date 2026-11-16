@@ -1,4 +1,4 @@
-# VoixPrête : plan et checklist (≈ 1 h/jour au démarrage)
+# Ligne Claire : plan et checklist (≈ 1 h/jour au démarrage)
 
 **Offre** : messages vocaux pros (accueil, répondeur hors horaires, attente, fermeture) en voix IA française. Message : 19 € ; pack 3 messages : 39 €. Livré par e-mail < 1 h : MP3 + WAV 8 kHz mono (standards), textes pour relecture.
 **Clients** : TPE, artisans, cabinets, restaurants, associations (voir 10 pages métiers).
@@ -17,9 +17,9 @@ Budget de départ ≈ 25 € : domaine ≈ 10 €, ElevenLabs Starter ≈ 5 €/
 
 ## Ce que VOUS faites (~3 h)
 1. Statut micro-entrepreneur (formalites.entreprises.gouv.fr, gratuit) → SIRET.
-2. Vérifier le nom « VoixPrête » (INPI) et acheter un domaine → modifier `engine/brand.py`, relancer `python3 tools/build_site.py`.
+2. Vérifier le nom « Ligne Claire » (INPI) et acheter un domaine → modifier `engine/brand.py`, relancer `python3 tools/build_site.py`.
 3. Compte Stripe (France) + clé secrète ; URL des CGV dans les réglages ; `python3 -m engine.setup_stripe` → coller les 2 liens dans `site/config.js`.
-4. ElevenLabs (plan payant) : choisir 1 voix féminine + 1 masculine françaises, **vérifier leurs conditions d'usage commercial** ; noter les IDs.
+4. ElevenLabs : vous avez déjà le premier abonnement payant (licence commerciale incluse, à reconfirmer dans leurs conditions) → rien à acheter. Capacité ≈ 15 packs/mois (30 000 crédits) ; au-delà de ~13 packs/mois (objectif 500 €), prévoir le palier supérieur. Il reste à : choisir 1 voix féminine + 1 masculine françaises, **vérifier leurs conditions d'usage commercial** ; noter les IDs.
 5. Clé API Anthropic (~5 €) : Claude Pro ne l'inclut pas.
 6. Gmail : mot de passe d'application. Secrets GitHub : `STRIPE_SECRET_KEY, ANTHROPIC_API_KEY, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_F, ELEVENLABS_VOICE_M, SMTP_USER, SMTP_PASSWORD, OWNER_EMAIL`.
 7. Compléter CGV/mentions légales (SIRET, adresse, médiateur de la consommation : obligatoire).
