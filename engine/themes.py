@@ -1,0 +1,43 @@
+"""Situations de vie d'enfant. Le client choisit dans une liste fermée :
+aucun texte libre n'entre dans le prompt (sécurité + qualité maîtrisée)."""
+
+THEMES = [
+ dict(key="noir", label="Peur du noir", slug="histoire-peur-du-noir",
+  intro="Beaucoup d'enfants de 3 à 7 ans s'inquiètent quand la lumière s'éteint. Une histoire où le héros apprivoise l'obscurité avec douceur aide à transformer l'ombre en alliée.",
+  guide="Le héros a peur du noir. Il découvre que l'obscurité cache des amis lumineux (lucioles, étoiles, lune bienveillante). Il finit par s'endormir apaisé."),
+ dict(key="rentree", label="Première rentrée / nouvelle école", slug="histoire-rentree-ecole",
+  intro="Quitter la maison pour l'école, rencontrer de nouveaux visages : une histoire dont l'enfant est le héros prépare la rentrée en douceur.",
+  guide="Le héros entre dans une nouvelle école/classe. Il est un peu inquiet, rencontre un nouvel ami, et réalise qu'il a sa place."),
+ dict(key="fratrie", label="Arrivée d'un petit frère ou d'une petite sœur", slug="histoire-arrivee-bebe-frere-soeur",
+  intro="L'arrivée d'un bébé bouleverse la place de l'aîné. Cette histoire lui rappelle qu'il reste unique et que l'amour ne se partage pas : il se multiplie.",
+  guide="Le héros va avoir/vient d'avoir un petit frère ou une petite sœur. Il ressent de la jalousie puis découvre son rôle précieux de grand."),
+ dict(key="tetine", label="Dire au revoir à la tétine ou au doudou-bébé", slug="histoire-arreter-la-tetine",
+  intro="Arrêter la tétine est une grande étape. Une histoire valorise le courage de l'enfant au lieu de lui faire sentir un manque.",
+  guide="Le héros est prêt à dire au revoir à sa tétine, qui part vers de nouveaux petits bébés. Il est fier de grandir."),
+ dict(key="dentiste", label="Aller chez le dentiste ou le médecin", slug="histoire-dentiste-medecin",
+  intro="Les soins font parfois peur. Imaginer d'avance la visite, avec un héros courageux, rassure souvent avant le jour J.",
+  guide="Le héros va chez le dentiste/médecin. Il a peur, le soignant lui explique chaque geste avec gentillesse, tout se passe bien. Ne donne aucun conseil médical."),
+ dict(key="pot", label="Apprendre à être propre", slug="histoire-apprendre-etre-propre",
+  intro="La propreté s'apprend à son rythme. Une histoire drôle et sans pression dédramatise l'étape.",
+  guide="Le héros apprend à utiliser le pot/les toilettes avec humour et sans pression, avec des encouragements et des essais ratés qui ne sont pas grave."),
+ dict(key="demenagement", label="Déménagement ou séparation des parents", slug="histoire-demenagement-separation",
+  intro="Quand le quotidien change, les enfants ont besoin de repères. Une histoire douce leur dit que l'amour reste, même quand la maison change.",
+  guide="Le héros vit un changement (nouvelle maison / deux maisons). Il garde avec lui ce qui compte : l'amour de sa famille et ses souvenirs. Aucun reproche envers un parent."),
+ dict(key="colere", label="Gérer la colère et les grosses émotions", slug="histoire-gerer-la-colere",
+  intro="Les colères font partie de l'enfance. Mettre des images sur l'émotion aide l'enfant à la reconnaître et à l'apaiser.",
+  guide="Le héros a une grosse colère représentée par un petit dragon/orage. Il apprend à respirer et à l'apprivoiser."),
+ dict(key="sommeil", label="Avoir du mal à s'endormir (histoire de relaxation)", slug="histoire-pour-s-endormir",
+  intro="Une histoire lente, répétitive et apaisante installe le rituel du coucher et accompagne le corps vers le sommeil.",
+  guide="Histoire très calme, rythme lent, répétitions, respiration guidée, décor nocturne doux. La fin amène le héros à s'endormir."),
+ dict(key="animal", label="Un animal de compagnie qui est parti", slug="histoire-deuil-animal-de-compagnie",
+  intro="Perdre un animal est souvent le premier chagrin d'un enfant. Une histoire tendre aide à parler de l'absence et des souvenirs.",
+  guide="Le héros pense à son animal qui n'est plus là. L'histoire est douce, honnête, sans détail dur, centrée sur les souvenirs heureux et l'amour qui reste."),
+ dict(key="amitie", label="Se faire des amis / apprendre à partager", slug="histoire-amitie-partage",
+  intro="Se faire des amis demande du courage. Une histoire montre simplement comment inviter, partager et réparer une dispute.",
+  guide="Le héros veut se faire un ami. Après une maladresse, il apprend à partager et à s'excuser. Il gagne un ami."),
+ dict(key="aventure", label="Une aventure magique, juste pour le plaisir", slug="histoire-aventure-magique-enfant",
+  intro="Parfois, pas besoin de raison : une aventure où l'enfant est le héros d'un monde magique, pour rêver avant de dormir.",
+  guide="Aventure féerique, douce, avec un compagnon animal magique et un trésor qui est une belle surprise. Fin paisible."),
+]
+BY_LABEL = {t["label"]: t for t in THEMES}
+BY_KEY = {t["key"]: t for t in THEMES}
