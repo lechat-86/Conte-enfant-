@@ -1,5 +1,6 @@
 """Configuration commerciale unique : modifiez ici, tout le reste suit."""
-NAME = "Conte Doux"                      # à vérifier : INPI + nom de domaine disponibles
-DOMAIN = "https://contedoux.example"     # remplacer par le vrai domaine
-SUPPORT_EMAIL = "contact@contedoux.example"
-PRICE_EUR = 4.90
+NAME = "VoixPrête"                       # à vérifier : INPI + domaine disponibles
+DOMAIN = "https://voixprete.example"     # remplacer par le vrai domaine
+SUPPORT_EMAIL = "contact@voixprete.example"
+PRICE_SINGLE = 19
+PRICE_PACK = 39

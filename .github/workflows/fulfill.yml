@@ -1,4 +1,4 @@
-name: Livraison des histoires
+name: Livraison des messages
 on:
   schedule: [{cron: "*/30 * * * *"}]
   workflow_dispatch:
@@ -14,7 +14,8 @@ jobs:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          ELEVENLABS_VOICE_F: ${{ secrets.ELEVENLABS_VOICE_F }}
+          ELEVENLABS_VOICE_M: ${{ secrets.ELEVENLABS_VOICE_M }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
