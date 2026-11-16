@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m engine.fulfill
+      - run: python3 -m engine.fulfill && python3 -m engine.followup
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -19,4 +19,5 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          REVIEW_URL: ${{ vars.REVIEW_URL }}
           REVIEW_MODE: ${{ vars.REVIEW_MODE || '1' }}

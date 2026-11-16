@@ -12,7 +12,12 @@ def send(to, subject, text, attachments=(), smtp=None):
         msg.add_attachment(data, maintype=main, subtype=sub, filename=fname)
     if smtp:
         smtp(msg); return
-    with smtplib.SMTP_SSL(os.environ.get("SMTP_HOST", "smtp.gmail.com"), 465) as s:
+    host, port = os.environ.get("SMTP_HOST", "smtp.gmail.com"), int(os.environ.get("SMTP_PORT", "465"))
+    if os.environ.get("SMTP_SECURITY", "ssl") == "none":      # tests locaux uniquement
+        with smtplib.SMTP(host, port) as s:
+            s.send_message(msg)
+        return
+    with smtplib.SMTP_SSL(host, port) as s:
         s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
         s.send_message(msg)
 
@@ -23,4 +28,5 @@ def delivery_text(company, scripts):
             f"Textes enregistrés :\n\n{body}\n\n"
             f"Relisez attentivement (horaires, noms) : le texte est rédigé à partir de vos informations avec l'aide d'une IA, la voix est synthétique.\n"
             f"Une modification de texte offerte : répondez à ce mail en indiquant ce que vous souhaitez changer.\n"
+            f"Installation : importez le fichier WAV (ou MP3) dans l'interface de votre standard / box / application téléphonique, rubrique message d'accueil, répondeur ou attente.\n"
             f"Si le résultat ne vous convient pas, nous vous remboursons.\n\n— {brand.NAME}\n")

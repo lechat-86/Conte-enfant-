@@ -1,0 +1,9 @@
+Objet: Re: Votre répondeur, $entreprise
+
+Bonjour $prenom,
+
+Je me permets une dernière fois de revenir vers vous : si votre message d'accueil est déjà satisfaisant, ignorez ce mail. Sinon, voici un exemple de ce que nous livrons pour un $metier : $lien_exemples
+
+$signature
+---
+Réponse « STOP » = plus aucun message de notre part. Données : $expediteur ($contact), supprimées sur demande.

@@ -38,7 +38,7 @@ def generate(company, mtype, infos, api_key=None, post=None):
     if post:
         data = post(payload)
     else:
-        req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(), method="POST",
+        req = urllib.request.Request(os.environ.get("ANTHROPIC_BASE", "https://api.anthropic.com") + "/v1/messages", data=json.dumps(payload).encode(), method="POST",
             headers={"x-api-key": api_key or os.environ["ANTHROPIC_API_KEY"], "anthropic-version": "2023-06-01", "content-type": "application/json"})
         data = json.load(urllib.request.urlopen(req, timeout=120))
     return validate(data["content"][0]["text"], company, infos, mtype)

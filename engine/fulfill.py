@@ -23,7 +23,7 @@ def plan(session):
     voice = field(session, "voix") or "f"
     return [(m, voice if voice in ("f", "m") else "f") for m in PACK]
 
-def run(stripe=st.call, gen=script.generate, tts=audio.synthesize, wav=audio.to_wav_pbx, send=mail.send, since_days=7, now=time.time):
+def run(stripe=st.call, gen=script.generate, tts=audio.synthesize, wav=audio.to_wav_pbx, master=audio.master_mp3, check=audio.validate_wav, send=mail.send, since_days=7, now=time.time):
     review = os.environ.get("REVIEW_MODE", "1") == "1"
     owner = os.environ.get("OWNER_EMAIL")
     done = failed = 0
@@ -45,9 +45,13 @@ def run(stripe=st.call, gen=script.generate, tts=audio.synthesize, wav=audio.to_
                 txt = gen(company, mtype, infos)
                 mp3 = tts(txt, os.environ[f"ELEVENLABS_VOICE_{voice.upper()}"])
                 scripts.append((MESSAGE_TYPES[mtype]["label"], txt))
-                files.append((f"{mtype}.mp3", mp3, "audio/mpeg"))
+                final = master(mp3)
                 w = wav(mp3)
-                if w: files.append((f"{mtype}_standard-8khz.wav", w, "audio/wav"))
+                if not final or not w:                      # le WAV fait partie de l'offre : pas de livraison dégradée
+                    raise RuntimeError("post-traitement audio indisponible (ffmpeg)")
+                check(w)
+                files.append((f"{mtype}.mp3", final, "audio/mpeg"))
+                files.append((f"{mtype}_standard-8khz.wav", w, "audio/wav"))
             body = mail.delivery_text(company, scripts)
             if review and owner:
                 send(owner, f"[À valider] {company} -> {email}", body, files)

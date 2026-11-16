@@ -1,0 +1,13 @@
+Objet: Un service à ajouter à vos sites clients ($entreprise)
+
+Bonjour $prenom,
+
+Vous créez des sites ou gérez l'informatique de TPE et d'artisans. Beaucoup de vos clients ont un répondeur absent ou approximatif, alors que le téléphone reste leur premier canal de vente.
+
+Nous proposons des messages vocaux professionnels (accueil, répondeur, attente, fermeture) en voix française, fichiers MP3/WAV prêts pour leur standard, en moins d'une heure, dès $prix_msg €. Pour vous : une commission de $commission % sur chaque commande passée via votre lien dédié, et un exemple clé en main à montrer à vos clients : $lien_exemples
+
+Seriez-vous partant pour tester gratuitement un message sur l'un de vos propres numéros ?
+
+$signature
+---
+Message professionnel adressé à $entreprise ($source). Répondez « STOP » pour ne plus être contacté. Données : $expediteur ($contact), supprimées sur demande.

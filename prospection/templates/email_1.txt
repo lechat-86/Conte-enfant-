@@ -1,0 +1,13 @@
+Objet: Votre répondeur, $entreprise
+
+Bonjour $prenom,
+
+$observation
+
+Pour un $metier, c'est souvent le premier contact avec un futur client. Nous préparons des messages d'accueil et de répondeur professionnels (texte adapté à votre activité, voix française naturelle, fichiers MP3 et WAV prêts pour votre téléphone), livrés en moins d'une heure, à partir de $prix_msg € : $lien
+
+Écoutez des exemples ici : $lien_exemples
+
+$signature
+---
+Vous recevez ce message à titre professionnel car votre adresse figure sur $source. Pour ne plus jamais être contacté, répondez simplement « STOP » : votre demande sera prise en compte immédiatement. Données traitées par $expediteur ($contact) uniquement pour cette prise de contact, supprimées sur demande ; droit d'accès, d'opposition et de réclamation auprès de la CNIL.

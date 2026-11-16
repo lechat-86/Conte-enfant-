@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://ligneclaire.example/sitemap.xml
+Disallow: /merci.html
+Sitemap: https://premierevoix.example/sitemap.xml

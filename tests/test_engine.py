@@ -23,9 +23,12 @@ class T(unittest.TestCase):
         with self.assertRaises(ValueError): fulfill.plan({"custom_fields": [{"key": "message", "type": "dropdown", "dropdown": {"value": "x_f"}}]})
     @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg absent")
     def test_wav(self):
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=d=1", "/tmp/t.mp3"], check=True)
-        w = audio.to_wav_pbx(open("/tmp/t.mp3", "rb").read())
-        self.assertTrue(w.startswith(b"RIFF"))
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=300:d=3", "/tmp/t.mp3"], check=True)
+        raw = open("/tmp/t.mp3", "rb").read()
+        w = audio.to_wav_pbx(raw)
+        self.assertTrue(w.startswith(b"RIFF")); self.assertGreater(audio.validate_wav(w), 1.0)
+        self.assertTrue(audio.master_mp3(raw))
+        with self.assertRaises(ValueError): audio.validate_wav(b"pas un wav")
     def _sess(self, fields):
         return {"id": "cs_1", "payment_status": "paid", "payment_intent": "pi_1", "customer_details": {"email": "c@x.fr"}, "custom_fields": fields}
     def _stripe(self, session, pi):
@@ -40,7 +43,7 @@ class T(unittest.TestCase):
         sent, pi = [], {"id": "pi_1", "metadata": {}}
         s = self._sess([{"key": "entreprise", "type": "text", "text": {"value": "Dupont Plomberie"}},
                         {"key": "voix", "type": "dropdown", "dropdown": {"value": "f"}}])
-        kw = dict(stripe=self._stripe(s, pi), gen=lambda c, m, i: OK, tts=lambda t, v: b"MP3", wav=lambda m: b"WAV",
+        kw = dict(stripe=self._stripe(s, pi), gen=lambda c, m, i: OK, tts=lambda t, v: b"MP3", wav=lambda m: b"WAV", master=lambda m: b"MP3M", check=lambda w: None,
                   send=lambda *a, **k: sent.append(a))
         self.assertEqual(fulfill.run(**kw), (1, 0)); self.assertEqual(fulfill.run(**kw), (0, 0))
         self.assertEqual(len(sent), 1); self.assertEqual(sent[0][0], "c@x.fr"); self.assertEqual(len(sent[0][3]), 6)
@@ -48,8 +51,14 @@ class T(unittest.TestCase):
         os.environ.update(REVIEW_MODE="1", OWNER_EMAIL="o@x.fr", ELEVENLABS_VOICE_F="vf")
         sent, pi = [], {"id": "pi_1", "metadata": {}}
         s = self._sess([{"key": "message", "type": "dropdown", "dropdown": {"value": "accueil_f"}}])
-        fulfill.run(stripe=self._stripe(s, pi), gen=lambda c, m, i: OK, tts=lambda t, v: b"MP3", wav=lambda m: None, send=lambda *a, **k: sent.append(a))
+        fulfill.run(stripe=self._stripe(s, pi), gen=lambda c, m, i: OK, tts=lambda t, v: b"MP3", wav=lambda m: b"W", master=lambda m: b"M", check=lambda w: None, send=lambda *a, **k: sent.append(a))
         self.assertEqual(sent[0][0], "o@x.fr")
+    def test_missing_wav_is_not_delivered(self):
+        os.environ.update(REVIEW_MODE="0", OWNER_EMAIL="o@x.fr", ELEVENLABS_VOICE_F="vf")
+        sent, pi = [], {"id": "pi_1", "metadata": {}}
+        s = self._sess([{"key": "message", "type": "dropdown", "dropdown": {"value": "accueil_f"}}])
+        r = fulfill.run(stripe=self._stripe(s, pi), gen=lambda c, m, i: OK, tts=lambda t, v: b"MP3", wav=lambda m: None, master=lambda m: b"M", check=lambda w: None, send=lambda *a, **k: sent.append(a))
+        self.assertEqual(r, (0, 1)); self.assertEqual(sent, []); self.assertNotIn("delivered", pi["metadata"])
     def test_failure_alerts_after_retries(self):
         os.environ.update(REVIEW_MODE="0", OWNER_EMAIL="o@x.fr")
         sent, pi = [], {"id": "pi_1", "metadata": {}}

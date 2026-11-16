@@ -1,0 +1,6 @@
+# Données de prospection = données personnelles (RGPD) : jamais dans le dépôt
+prospection/prospects.csv
+prospection/optout.txt
+prospection/drafts/
+doctor_*.mp3
+__pycache__/
