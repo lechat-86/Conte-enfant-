@@ -49,3 +49,15 @@ test('items issus d’un dossier de démonstration (anomalies + manquants)', () 
   assert.deepEqual(items.map((i) => `${i.kind}:${i.code || ''}`).sort(), ['issue:incomplete', 'issue:wrong_type', 'missing:']);
   assert.equal(itemsFromDossier(d, { includeMissing: false }).length, 2);
 });
+
+test('première demande (dossier sans aucune pièce reçue) : ne prétend jamais avoir reçu des documents', () => {
+  const items = [{ kind: 'missing', type: 'bank_statement' }, { kind: 'missing', type: 'payslips' }];
+  const fr = buildMessage({ ...base, lang: 'fr', items });
+  const en = buildMessage({ ...base, lang: 'en', items });
+  assert.match(fr, /Pour constituer le dossier DOS-9, merci de nous transmettre/);
+  assert.ok(!/bien reçu/.test(fr));
+  assert.match(en, /To set up file DOS-9, please send us/);
+  assert.ok(!/have received/.test(en));
+  // dès qu'une anomalie existe, la formulation « reçu » est conservée
+  assert.match(buildMessage({ ...base, lang: 'fr', items: [...items, incomplete] }), /bien reçu vos documents/);
+});

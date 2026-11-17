@@ -31,9 +31,9 @@ public/
     core/                    html.js (templates échappés), i18n.js, format.js, actions.js, bus.js
     i18n/                    fr.js, en.js (405 clés chacune, parité testée)
     ui/                      composants, graphiques SVG/CSS, modales, toasts, icônes
-    views/                   une vue par page (+ formulaires, assistant)
+    views/                   une vue par page (+ formulaires, assistant, landing, tour = démo guidée)
     app.js                   routeur par hash, coque, rendu
-tests/unit/                  73 tests ; tests/e2e/run.mjs : 22 tests navigateur
+tests/unit/                  84 tests ; tests/e2e/run.mjs : 27 tests navigateur
 ```
 
 **Règle de dépendance** : `domain` ← `engine` ← `data` ← `views/ui` ← `app`. `domain` n'importe jamais de `views`/`ui`/DOM (vérifié : les tests unitaires l'importent directement sous Node).

@@ -88,7 +88,7 @@ export function render({ store, params, now }) {
     </section>`;
 }
 
-function assistantFor(dossierId, onlySlot) {
+export function assistantFor(dossierId, onlySlot) {
   const store = getStore();
   const d = store.dossier(dossierId);
   const client = store.client(d.clientId);

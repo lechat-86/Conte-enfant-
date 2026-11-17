@@ -53,7 +53,7 @@ const waitState = (page, id, state) => page.waitForSelector(`[data-slot="${id}"]
 
 console.log('\nREADYFILE AI — tests end-to-end\n');
 
-const ROUTES = ['/', '/clients', '/clients/CLI-003', '/dossiers', '/dossiers/DOS-007', '/analysis', '/pricing', '/settings', '/portal/demo-dos-003'];
+const ROUTES = ['/welcome', '/', '/clients', '/clients/CLI-003', '/dossiers', '/dossiers/DOS-007', '/analysis', '/pricing', '/settings', '/portal/demo-dos-003'];
 
 await test('Toutes les pages se chargent (FR puis EN) sans erreur JS ni clé manquante', async ({ page, go }) => {
   for (const lang of ['fr', 'en']) {
@@ -67,6 +67,132 @@ await test('Toutes les pages se chargent (FR puis EN) sans erreur JS ni clé man
   }
   await go('/inexistant');
   assert.match(await text(page, 'main'), /introuvable|not found/i);
+});
+
+await test('Ouverture : la présentation commerciale s’affiche, avec promesse, problème, offres et limites honnêtes', async ({ page }) => {
+  await page.goto(BASE);
+  await page.waitForSelector('.landing');
+  assert.match(page.url(), /#\/welcome$/);
+  const txt = await text(page, '.landing');
+  assert.match(txt, /Des dossiers clients complets, sans courir après les pièces/);
+  for (const w of ['ping-pong', 'Notre hypothèse', 'Comment ça marche', 'STARTER', '49', '99', '199', 'Ce qui ne l’est pas', 'simulée', 'aucune coordonnée']) assert.ok(txt.includes(w), `manque « ${w} »`);
+  assert.match(await text(page, '.l-honest'), /Maquette fonctionnelle/);
+  assert.match(await text(page, '#l-pricing .note-warn'), /pas des tarifs commercialisés/);
+  // garde-fou anti-promesse : ni témoignage, ni statistique, ni logo client
+  assert.ok(!/t[ée]moignage|garanti|%|ils nous font confiance/i.test(txt), 'formulation commerciale interdite');
+  assert.equal(await page.locator('.landing img').count(), 0);
+  await page.locator('.topbar .seg-btn, .landing-top .seg-btn[lang="en"]').first().click();
+  assert.match(await text(page, '.landing'), /Complete client files, without chasing documents/);
+  assert.match(await text(page, '.landing'), /What is not \(yet\)/);
+  await noMissingKeys(page, 'landing EN');
+  await page.click('.landing-top a.btn');
+  await page.waitForSelector('.kpi-grid');
+});
+
+await test('Présentation : mini-démo interactive (6 cas, résultat + message proposé, FR/EN)', async ({ page, go }) => {
+  await go('/welcome');
+  const expect = { ok: 'none', unreadable: 'unreadable', wrong_type: 'wrong_type', duplicate: 'duplicate', wrong_period: 'wrong_period', incomplete: 'incomplete' };
+  for (const [sc, issue] of Object.entries(expect)) {
+    await page.click(`[data-action="landing-scenario"][data-scenario="${sc}"]`);
+    assert.equal(await page.locator('[data-testid="landing-result"]').getAttribute('data-issue'), issue, sc);
+    const msg = await text(page, '[data-testid="landing-message"]');
+    assert.ok(sc === 'ok' ? /Aucun message nécessaire/.test(msg) : /^Bonjour Camille,/.test(msg), `${sc}: ${msg}`);
+    assert.match(await text(page, '.demo-card-res'), /simulation/i);
+  }
+  await page.click('[data-action="landing-scenario"][data-scenario="incomplete"]');
+  assert.match(await text(page, '[data-testid="landing-message"]'), /semble incomplet\. Pourriez-vous nous transmettre une nouvelle version comportant toutes les pages/);
+  await page.locator('.landing-top .seg-btn[lang="en"]').click();
+  assert.match(await text(page, '[data-testid="landing-message"]'), /^Hello Camille,[\s\S]*appears to be incomplete/);
+  await page.click('[data-action="landing-scroll"][data-target="l-pricing"]');
+});
+
+await test('Démo guidée : les 7 étapes de bout en bout (création → demande → dépôt → anomalies → message → progression)', async ({ page, go }) => {
+  await go('/welcome');
+  const step = async () => Number(await page.locator('[data-testid="tour"]').getAttribute('data-step'));
+  // l'état précédent est réinitialisé au lancement
+  await page.click('[data-action="tour-start"] >> nth=0');
+  await page.waitForSelector('[data-testid="tour"]');
+  assert.equal(await step(), 1);
+  assert.match(await text(page, '[data-testid="tour"]'), /Données entièrement fictives/);
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('h1:has-text("Dossiers")');
+  assert.equal(await step(), 2);
+  await page.click('[data-action="tour-do"]'); // crée le client + dossier de démo
+  await page.waitForSelector('.summary-bar');
+  const id = (await text(page, 'h1')).match(/DOS-\d+/)[0];
+  assert.equal(id, 'DOS-013');
+  assert.match(await text(page, '.summary-bar'), /En attente/);
+  assert.match(await text(page, 'main'), /Atelier Démo SARL/);
+  // 3 : demande de documents (aucun envoi)
+  await page.click('[data-action="tour-next"]');
+  assert.equal(await step(), 3);
+  await page.click('[data-action="tour-do"]');
+  const req = await page.inputValue('#msg-text');
+  assert.match(req, /Pour constituer le dossier DOS-013, merci de nous transmettre/);
+  assert.ok(!/bien reçu/.test(req), 'une première demande ne doit pas dire « bien reçu »');
+  assert.match(req, /#\/portal\/demo-dos-013/);
+  assert.ok(await page.locator('.modal button', { hasText: 'Envoyer' }).isDisabled());
+  await page.keyboard.press('Escape');
+  // 4 : dépôt client simulé dans le portail
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('[data-testid="portal-docs"]');
+  assert.equal(await step(), 4);
+  assert.match(await text(page, '.portal-hero'), /Bonjour Claire Démo/);
+  await page.click('[data-action="tour-do"]');
+  await waitState(page, 'DOS-013-S1', 'valid');
+  await waitState(page, 'DOS-013-S2', 'invalid');
+  await waitState(page, 'DOS-013-S3', 'valid');
+  await waitState(page, 'DOS-013-S4', 'invalid');
+  assert.match(await text(page, '.portal-hero'), /50%/);
+  // 5 : détection côté cabinet
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('.summary-bar');
+  assert.equal(await step(), 5);
+  assert.match(await text(page, 'tr[data-slot="DOS-013-S2"]'), /Incomplet/);
+  assert.match(await text(page, 'tr[data-slot="DOS-013-S4"]'), /Illisible/);
+  assert.match(await text(page, '.summary-bar'), /À corriger/);
+  // 6 : message de correction avec les deux anomalies
+  await page.click('[data-action="tour-next"]');
+  await page.click('[data-action="tour-do"]');
+  const fix = await page.inputValue('#msg-text');
+  assert.match(fix, /bien reçu vos documents/);
+  assert.match(fix, /incomplet \(3\/6 pages\)/);
+  assert.match(fix, /illisible/);
+  await page.keyboard.press('Escape');
+  // 7 : re-dépôt corrigé → complet, puis fin sur le tableau de bord à jour
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('[data-testid="portal-docs"]');
+  assert.equal(await step(), 7);
+  await page.click('[data-action="tour-do"]');
+  await waitState(page, 'DOS-013-S2', 'valid');
+  await waitState(page, 'DOS-013-S4', 'valid');
+  assert.match(await text(page, '.portal-hero'), /100%/);
+  assert.match(await text(page, '.portal-hero'), /Complet/);
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('.kpi-grid');
+  assert.equal(await page.locator('[data-testid="tour"]').count(), 0, 'la démo guidée se termine');
+  assert.equal(await kpi(page, 'Dossiers'), '13');
+  assert.equal(await kpi(page, 'Documents validés'), '34');
+});
+
+await test('Démo guidée : précédent / quitter / anglais, sans erreur', async ({ page, go }) => {
+  await go('/welcome');
+  await page.locator('.landing-top .seg-btn[lang="en"]').click();
+  await page.click('[data-action="tour-start"] >> nth=0');
+  await page.click('[data-action="tour-next"]');
+  await page.click('[data-action="tour-do"]');
+  await page.waitForSelector('.summary-bar');
+  assert.match(await text(page, '[data-testid="tour"]'), /guided demo · step 2\/7/i);
+  assert.match(await text(page, 'main'), /Demo Workshop Ltd/);
+  await page.click('[data-action="tour-next"]');
+  await page.click('[data-action="tour-do"]');
+  assert.match(await page.inputValue('#msg-text'), /^Hello Claire Démo,[\s\S]*To set up file DOS-013, please send us/);
+  await page.keyboard.press('Escape');
+  await page.click('[data-action="tour-back"]');
+  assert.equal(await page.locator('[data-testid="tour"]').getAttribute('data-step'), '2');
+  await page.click('[data-action="tour-quit"]');
+  assert.equal(await page.locator('[data-testid="tour"]').count(), 0);
+  await noMissingKeys(page, 'tour EN');
 });
 
 await test('Tableau de bord : KPI cohérents avec les données de démonstration', async ({ page, go }) => {
@@ -474,6 +600,20 @@ await test('Mobile (390 px) : menu tiroir, navigation, tableaux empilés, sans d
   await page.waitForSelector('.sidebar', { state: 'hidden', timeout: 2000 }).catch(() => { throw new Error('le voile ne ferme pas le tiroir'); });
   await page.locator('.topbar .seg-btn[lang="en"]').click();
   assert.equal(await text(page, 'h1'), 'Dashboard');
+}, { viewport: { width: 390, height: 844 }, mobile: true });
+
+await test('Mobile : présentation et démo guidée utilisables (sans débordement)', async ({ page, go }) => {
+  await go('/welcome');
+  await noOverflow(page, 'landing @390');
+  await page.click('[data-action="tour-start"] >> nth=0');
+  await page.waitForSelector('[data-testid="tour"]');
+  await noOverflow(page, 'tour @390');
+  const box = await page.locator('[data-testid="tour"]').boundingBox();
+  assert.ok(box.x >= 0 && box.x + box.width <= 391, 'le panneau de démo dépasse de l’écran');
+  await page.click('[data-action="tour-next"]');
+  await page.click('[data-action="tour-next"]');
+  await page.waitForSelector('.summary-bar, [data-testid="portal-docs"], h1');
+  await noOverflow(page, 'tour step 3 @390');
 }, { viewport: { width: 390, height: 844 }, mobile: true });
 
 await test('Tablette (820 px) : pas de débordement sur toutes les pages', async ({ page, go }) => {

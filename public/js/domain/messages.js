@@ -58,7 +58,9 @@ export function buildMessage({ lang, clientName, firmName, period, items, link, 
       }, lang),
     );
   } else {
-    parts.push(t('msg.intro', { dossier: dossierId || '' }, lang).trim(), '');
+    // Uniquement des pièces manquantes = première demande de documents (rien n'a encore été reçu).
+    const request = items.every((i) => i.kind === 'missing');
+    parts.push(t(request ? 'msg.intro_request' : 'msg.intro', { dossier: dossierId || '' }, lang).trim(), '');
     for (const it of items) parts.push(`• ${itemText(it, period, lang)}`);
   }
   if (link) parts.push('', t('msg.link', { link }, lang));

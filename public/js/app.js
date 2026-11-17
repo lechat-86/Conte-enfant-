@@ -17,6 +17,8 @@ import * as lab from './views/lab.js';
 import * as portal from './views/portal.js';
 import * as pricing from './views/pricing.js';
 import * as settings from './views/settings.js';
+import * as landing from './views/landing.js';
+import * as tour from './views/tour.js';
 
 const LANG_KEY = 'readyfile-lang';
 const routes = [
@@ -29,6 +31,7 @@ const routes = [
   { re: /^\/pricing$/, view: pricing, nav: 'pricing' },
   { re: /^\/settings$/, view: settings, nav: 'settings' },
   { re: /^\/portal\/([\w-]+)$/, keys: ['token'], view: portal, nav: null },
+  { re: /^\/welcome$/, view: landing, nav: null },
 ];
 const NAV = [
   ['dashboard', '/', 'dashboard'],
@@ -50,7 +53,8 @@ try {
 } catch { /* stockage indisponible */ }
 
 function parseHash() {
-  const raw = location.hash.replace(/^#/, '') || '/';
+  if (!location.hash) location.replace('#/welcome'); // première ouverture : présentation commerciale
+  const raw = location.hash.replace(/^#/, '') || '/welcome';
   const [path, qs = ''] = raw.split('?');
   return { path: path.replace(/(.)\/$/, '$1'), query: Object.fromEntries(new URLSearchParams(qs)) };
 }
@@ -81,6 +85,7 @@ function shell(content, { nav, attention }) {
         <a class="brand" href="#/">${logoMark(32)}<span><strong>READYFILE</strong><em>AI</em></span></a>
         <nav>${NAV.map(([key, path, ic]) => h`<a class="nav-link" href="#${path}" ${nav === key ? 'aria-current="page"' : ''}>${icon(ic, 19)}<span>${t(`nav.${key}`)}</span></a>`)}</nav>
         <div class="side-foot">
+          <a class="nav-link" href="#/welcome">${icon('globe', 18)}<span>${t('nav.welcome')}</span></a>
           ${sample ? h`<a class="nav-link nav-portal" href="#/portal/${sample.token}">${icon('external', 18)}<span>${t('nav.portal_demo')}</span></a>` : ''}
           <div class="demo-card"><span class="dot-live"></span><div><strong>${t('demo.mode')}</strong><small>${t('demo.mode_text')}</small></div></div>
         </div>
@@ -112,6 +117,10 @@ function portalShell(content) {
   </div>`;
 }
 
+function landingShell(content) {
+  return h`<div class="portal-shell">${landing.topbar()}<main id="main" tabindex="-1">${content}</main></div>`;
+}
+
 function render() {
   const { path, query } = parseHash();
   const root = document.getElementById('app');
@@ -131,11 +140,14 @@ function render() {
     content = hit.route.view.render({ store, state, params: hit.params, query, now });
   }
   const attention = state.dossiers.filter((d) => needsIntervention(d, now)).length;
-  const isPortal = hit?.route.view.layout === 'portal';
-  root.innerHTML = str(isPortal ? portalShell(content) : shell(content, { nav: hit?.route.nav, attention }));
+  const layoutName = hit?.route.view.layout;
+  const isPortal = layoutName === 'portal';
+  root.innerHTML = str(layoutName === 'landing' ? landingShell(content) : isPortal ? portalShell(content) : shell(content, { nav: hit?.route.nav, attention }));
+  root.insertAdjacentHTML('beforeend', str(tour.panel()));
+  document.body.classList.toggle('tour-on', tour.tourActive());
   root.querySelector('#main')?.classList.toggle('enter', navigated);
 
-  const label = hit?.route.nav ? t(`nav.${hit.route.nav}`) : isPortal ? t('portal.title') : t('common.not_found');
+  const label = hit?.route.nav ? t(`nav.${hit.route.nav}`) : isPortal ? t('portal.title') : layoutName === 'landing' ? t('nav.welcome') : t('common.not_found');
   document.title = `${label} · READYFILE AI`;
 
   if (navigated) {

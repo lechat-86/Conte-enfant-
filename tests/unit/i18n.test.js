@@ -29,7 +29,7 @@ test('les textes EN ne sont pas de simples copies du FR (liste blanche des ident
   const allowed = /^(plan\.(starter|pro|business)$|country\.|rm\.|msg\.signoff$)/;
   const identicalWords = new Set(['nav.clients', 'sim.tag', 'docstate.invalid', 'dash.clients_n', 'clients.health', 'dossier.actions', 'lab.verdict', 'lab.f_pages',
     'clients.dossiers', 'check.type', 'lab.f_fingerprint', 'clients.client', 'clients.title', 'dossiers.client', 'common.copy', 'via.email', 'dossiers.id', 'dash.w',
-    'portal.title', 'dossier.message', 'assistant.message', 'lab.f_type', 'status.pending', 'status.complete', 'clients.contact']);
+    'portal.title', 'landing.demo_client', 'dossier.message', 'assistant.message', 'lab.f_type', 'status.pending', 'status.complete', 'clients.contact']);
   const suspicious = same.filter((k) => !allowed.test(k) && !identicalWords.has(k));
   assert.deepEqual(suspicious, []);
 });
@@ -67,6 +67,10 @@ test('familles de clés dynamiques complètes', () => {
     ...['all', 'missing', 'issues', 'ok'].map((x) => `clients.health.${x}`),
     ...['to_fix', 'overdue'].map((x) => `reason.${x}`),
     ...['encryption', 'access', 'isolation', 'deletion', 'audit_log', 'retention', 'gdpr', 'hosting'].flatMap((x) => [`rm.${x}`, `rm.${x}.target`]),
+    ...[1, 2, 3, 4].flatMap((n) => [`landing.p${n}`, `landing.b${n}_t`, `landing.b${n}_d`, `landing.h${n}_t`, `landing.h${n}_d`]),
+    ...[1, 2, 3].flatMap((n) => [`landing.is${n}`, `landing.isnt${n}`]),
+    ...[1, 2, 3, 4, 5, 6, 7].flatMap((n) => [`tour.s${n}.title`, `tour.s${n}.text`, `tour.s${n}.sim`]),
+    ...[2, 3, 4, 6, 7].map((n) => `tour.s${n}.do`),
     'issue.ok.pro', 'lang.fr', 'lang.en', 'nav.dashboard', 'nav.clients', 'nav.dossiers', 'nav.analysis', 'nav.pricing', 'nav.settings',
     'event.client_created', 'event.dossier_created', 'event.document_received', 'event.analysis.ok', 'event.message_approved',
   ];
@@ -86,4 +90,15 @@ test('changement de langue à chaud et marqueur de clé manquante', () => {
   assert.match(t('cle.inexistante'), /^⟦cle\.inexistante⟧$/);
   setLang('xx'); // langue inconnue ignorée
   assert.equal(getLang(), 'fr');
+});
+
+test('présentation commerciale : aucun chiffre de résultat ni témoignage inventé (FR et EN)', () => {
+  for (const dict of [fr, en]) {
+    for (const [k, v] of Object.entries(dict)) {
+      if (!/^(landing|tour)\./.test(k)) continue;
+      assert.ok(!/%/.test(v), `pourcentage dans ${k} : ${v}`);
+      assert.ok(!/\b\d+\s?(clients|cabinets|firms|heures|hours|jours|days)\b/i.test(v), `chiffre de résultat dans ${k}`);
+      assert.ok(!/t[ée]moignage|testimonial|\bils nous font confiance\b|trusted by|garanti|guarantee/i.test(v), `formulation interdite dans ${k}`);
+    }
+  }
 });
