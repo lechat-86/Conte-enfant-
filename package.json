@@ -4,11 +4,15 @@
   "private": true,
   "description": "READYFILE AI - prototype local de démonstration (aucune dépendance, aucun service externe).",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
+    "growth": "node growth/server.js",
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:e2e": "node tests/e2e/run.mjs",
-    "test:all": "npm test && npm run test:e2e"
+    "test:growth": "node tests/e2e/growth.mjs",
+    "test:all": "npm test && npm run test:e2e && npm run test:growth"
   }
 }

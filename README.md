@@ -7,6 +7,10 @@
 
 L'application s'ouvre sur une **page de présentation** avec une **démo guidée de 7 étapes** (3 à 5 min). Documents de validation de marché, bilingues FR/EN : [`AUDIT`](docs/AUDIT.md) · [`POSITIONING`](docs/POSITIONING.md) · [`SALES_DEMO`](docs/SALES_DEMO.md) · [`CUSTOMER_INTERVIEW`](docs/CUSTOMER_INTERVIEW.md) · [`OBJECTIONS`](docs/OBJECTIONS.md) · [`COMPETITORS`](docs/COMPETITORS.md) · [`PRICING_TEST`](docs/PRICING_TEST.md) · [`VALIDATION_SCORECARD`](docs/VALIDATION_SCORECARD.md).
 
+## READYFILE GROWTH — outil interne de prospection (Mission 3)
+
+Espace de gestion commerciale **réservé à l'équipe**, séparé du produit (autre serveur, autre port, autre origine navigateur) : `npm run growth` → http://127.0.0.1:5174. Rien n'est envoyé, rien n'est collecté automatiquement. Voir [`docs/GROWTH.md`](docs/GROWTH.md).
+
 ## Lancer en 30 secondes
 
 Prérequis : **Node.js ≥ 20** (aucune dépendance à installer, pas de `npm install`).
@@ -32,8 +36,9 @@ Le serveur n'écoute que sur `127.0.0.1`. Les données de démonstration sont st
 ## Tests
 
 ```bash
-npm test            # 84 tests unitaires (node:test) — logique métier, i18n, store, données
+npm test            # 132 tests unitaires (node:test) — logique métier, i18n, store, données
 npm run test:e2e    # 27 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, mobile, tablette
+npm run test:growth # 20 tests navigateur de l'outil interne GROWTH
 npm run test:all
 ```
 
