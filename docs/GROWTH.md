@@ -37,6 +37,38 @@ Pour qu'aucun client de READYFILE AI ne puisse y accéder, GROWTH n'est **pas** 
 - **Analyse** : sous **10** cabinets avec entretien (`MIN_SAMPLE`), seulement des comptages bruts, jamais de moyenne, de médiane ou de pourcentage ; au-delà, une médiane de budget *indicative*. Les heures, fréquences et budgets sont **déclarés**, non vérifiés. Un cabinet compte une seule fois par valeur.
 - **Intérêt verbal ≠ volonté de payer** : le niveau 5 exige un **prix explicitement accepté et chiffré** ; cocher « prix accepté » sans montant (ou l'inverse) est refusé.
 
+### Import CSV de prospects (ajout sécurisé)
+Bouton **Importer des prospects** (page *Prospects* et *Données & paramètres*) → `#/import`. Parcours : **choisir** → **prévisualiser** → **valider** → **résultat**. Rien n'est créé avant votre confirmation ; la confirmation rappelle qu'aucun prospect existant n'est modifié et qu'aucun message n'est envoyé. Le fichier est lu **localement** (aucun envoi).
+
+**Format exact** — modèle vide : [`docs/growth-import-template.csv`](growth-import-template.csv) (ou bouton *Télécharger le modèle CSV*). UTF-8 (BOM toléré), séparateur `,` ou `;`, guillemets RFC 4180 (`""` pour un guillemet, champs multilignes permis). 1 000 lignes / 2 Mo maximum. Première ligne = en-têtes, insensibles à la casse.
+
+```
+firm,country,source_url,city,website,contact_name,contact_role,contact_email,email_verified,email_source_url,source_verified_on,status,next_action,next_action_date,budget_monthly_eur,notes
+```
+
+| Colonne | | Règle |
+|---|---|---|
+| `firm` | **obligatoire** | Nom exact, 2–120 caractères |
+| `country` | **obligatoire** | Code ISO : FR, GB, IE, US, CA, AU, NZ, SG, ZA, BE, CH, LU, DE, ES, IT, NL, PT (« UK », « France », « United Kingdom », « Royaume-Uni » acceptés) |
+| `source_url` | **obligatoire** | URL http(s) exacte de la page publique où le cabinet a été trouvé |
+| `city`, `website`, `contact_name`, `contact_role` | facultatives | `website` : URL http(s) complète |
+| `contact_email` | facultative | **Acceptée seulement si** `email_verified` = `yes`/`oui` **et** `email_source_url` est une URL http(s) de la page où l'adresse est publiée ; messageries grand public (gmail, orange.fr…) refusées |
+| `source_verified_on` | facultative | AAAA-MM-JJ, pas dans le futur |
+| `status` | facultative | `to_research` (défaut) ou `to_contact` **uniquement** : un import ne peut pas prétendre qu'un contact a eu lieu |
+| `next_action`, `next_action_date` | facultatives | La date exige la description |
+| `budget_monthly_eur` | facultative | 0 à 100000 |
+| `notes` | facultative | Description, services, taille *avec sa source*… (5000 car. max) |
+
+Colonnes inconnues (`id`, `problems`, `first_contact_at`, `demo`…) : **ignorées et signalées** — elles ne peuvent ni écraser un prospect ni gonfler vos statistiques. Les colonnes de nos rapports (`line_number`, `refusal_reasons`, `refusal_text`) sont tolérées.
+
+**Doublons** (refusés, jamais écrasés) : même site Internet (sans `www`, schéma ni chemin) **ou** même nom (sans accents, casse, ponctuation, `&`/`and`, forme juridique SARL/SAS/Ltd/LLP…) **dans le même pays** ; contre les prospects existants **et** à l'intérieur du fichier (la première ligne valide est gardée).
+
+**Garanties** : ajout seul (tout l'existant — prospects, activités, entretiens, objectifs — reste identique, dans le même ordre ; testé octet pour octet) ; identifiants à la suite (jamais réutilisés) ; revalidation complète **au moment d'écrire** (un prospect saisi entre-temps est détecté) ; aucun compteur (messages, réponses, démos, intentions, clients) n'est modifié ; chaque prospect importé reçoit une note d'historique avec fichier, ligne et source ; la provenance (`emailSourceUrl`, `sourceVerifiedAt`) est conservée et exportée.
+
+**Rapport des lignes refusées** : CSV (colonnes d'origine + `refusal_reasons` + `refusal_text`) téléchargeable à la prévisualisation et après l'import ; il peut être corrigé puis **réimporté tel quel**. **Sauvegarde JSON** proposée avant import. La **restauration JSON** existante est **inchangée** (elle remplace tout, contrairement à l'import CSV).
+
+**Limite connue** : deux onglets ouverts en même temps ne se synchronisent pas (le dernier à écrire gagne) — travaillez dans un seul onglet.
+
 ### Objectifs préconfigurés (modifiables)
 15 cabinets étudiés · 10 français · 5 anglophones · 5 démonstrations · 3 intentions sérieuses · 1 client payant. Le tableau de bord montre le réalisé, le reste à faire et « Objectif atteint ».
 
@@ -107,6 +139,17 @@ Dashboard (9 KPIs, funnel, weekly cumulative lines, goals, reminders), prospects
 - **Funnel** = number of firms that reached each stage (raw counts). **No conversion rate** is computed.
 - **Analysis**: below **10** firms with an interview (`MIN_SAMPLE`), raw counts only — never averages, medians or percentages; above, an *indicative* budget median. Hours, frequencies and budgets are **stated**, unverified. Each firm counts once per value.
 - **Verbal interest ≠ willingness to pay**: level 5 requires an **explicitly accepted, stated price**; ticking “price accepted” without an amount (or the reverse) is rejected.
+
+### Prospect CSV import (safe, add-only)
+**Import prospects** button (*Prospects* and *Data & settings* pages) → `#/import`. Flow: **choose** → **preview** → **confirm** → **result**. Nothing is created before you confirm; the confirmation states that no existing prospect is modified and no message is sent. The file is read **locally** (nothing is sent).
+
+**Exact format** — empty template: [`docs/growth-import-template.csv`](growth-import-template.csv) (or the *Download the CSV template* button). UTF-8 (BOM tolerated), `,` or `;` separator, RFC 4180 quoting (`""` for a quote, multi-line fields allowed). Max 1,000 rows / 2 MB. First row = headers, case-insensitive. Columns: `firm*`, `country*`, `source_url*`, `city`, `website`, `contact_name`, `contact_role`, `contact_email`, `email_verified`, `email_source_url`, `source_verified_on`, `status`, `next_action`, `next_action_date`, `budget_monthly_eur`, `notes` (* = required).
+
+Rules: `country` = ISO code (FR, GB, IE, US, CA, AU, NZ, SG, ZA, BE, CH, LU, DE, ES, IT, NL, PT; “UK”, “France”, “United Kingdom” accepted); `source_url` = exact public page URL; **an email is accepted only if** `email_verified` is `yes`/`oui` **and** `email_source_url` is the http(s) URL of the page where it is published (consumer mailboxes such as gmail refused — never guess an address); `status` = `to_research` (default) or `to_contact` **only**; unknown columns (`id`, `problems`, `first_contact_at`, `demo`…) are **ignored and reported**.
+
+**Duplicates** (refused, never overwritten): same website (ignoring `www`, scheme, path) **or** same name (ignoring accents, case, punctuation, `&`/`and`, legal form) **in the same country**; checked against existing prospects **and** within the file (first valid row kept).
+
+**Guarantees**: add-only (all existing prospects, activities, interviews and goals stay identical, in order; tested byte-for-byte); ids continue (never reused); full re-validation **at write time**; no counter (messages, replies, demos, intents, customers) is touched; each imported prospect gets a history note (file, row, source); provenance (`emailSourceUrl`, `sourceVerifiedAt`) is kept and exported. A **refused-rows report** (original columns + `refusal_reasons` + `refusal_text`) can be downloaded at preview and after import, fixed, and **re-imported as is**. A **JSON backup** is offered before import. The existing **JSON restore** is **unchanged** (it replaces everything, unlike the CSV import). **Known limit**: two tabs open at once do not sync (last write wins) — use a single tab.
 
 ### Preset goals (editable)
 15 firms studied · 10 French · 5 English-speaking · 5 demos · 3 serious intents · 1 paying customer; the dashboard shows progress, what remains and “Goal reached”.

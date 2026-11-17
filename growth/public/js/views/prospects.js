@@ -43,7 +43,7 @@ export function enter({ query }) {
 export function render({ state, today }) {
   const rows = filterProspects(state, F, today);
   return h`
-    ${pageHeader({ title: t('prospects.title'), sub: t('prospects.sub'), actions: h`<button class="btn" data-action="export-prospects">${icon('download')}${t('export.prospects')}</button><a class="btn btn-primary" href="${link('/prospects/new')}">${icon('plus')}${t('prospects.add')}</a>` })}
+    ${pageHeader({ title: t('prospects.title'), sub: t('prospects.sub'), actions: h`<a class="btn" href="${link('/import')}" data-testid="import-btn">${icon('upload')}${t('imp.button')}</a><button class="btn" data-action="export-prospects">${icon('download')}${t('export.prospects')}</button><a class="btn btn-primary" href="${link('/prospects/new')}">${icon('plus')}${t('prospects.add')}</a>` })}
     <section class="card">
       <div class="toolbar">
         <label class="search">${icon('search', 16)}<input id="p-q" type="search" data-input="p-q" value="${F.q}" placeholder="${t('prospects.search')}" aria-label="${t('prospects.search')}"></label>

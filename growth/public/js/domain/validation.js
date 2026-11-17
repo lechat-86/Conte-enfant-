@@ -16,6 +16,7 @@ export function validateProspect(input) {
     firm: clean(input.firm), country: clean(input.country), city: clean(input.city), website: clean(input.website),
     contactName: clean(input.contactName), contactRole: clean(input.contactRole), contactEmail: clean(input.contactEmail),
     emailLegit: input.emailLegit === true || input.emailLegit === 'on' || input.emailLegit === 'true',
+    emailSourceUrl: clean(input.emailSourceUrl), sourceVerifiedAt: clean(input.sourceVerifiedAt),
     sourceUrl: clean(input.sourceUrl), firstContactAt: clean(input.firstContactAt), status: clean(input.status) || 'to_research',
     notes: clean(input.notes), nextAction: clean(input.nextAction), nextActionDate: clean(input.nextActionDate),
     budgetMonthly: num(clean(input.budgetMonthly)), problems: tags(input.problems, PROBLEM_TAGS), problemsText: clean(input.problemsText),
@@ -32,6 +33,8 @@ export function validateProspect(input) {
     if (!EMAIL.test(v.contactEmail)) e.contactEmail = 'err.email';
     else if (!v.emailLegit) e.emailLegit = 'err.email_legit';
   }
+  if (v.emailSourceUrl && !isHttpUrl(v.emailSourceUrl)) e.emailSourceUrl = 'err.url';
+  if (v.sourceVerifiedAt && !isYmd(v.sourceVerifiedAt)) e.sourceVerifiedAt = 'err.date';
   if (v.firstContactAt && !isYmd(v.firstContactAt)) e.firstContactAt = 'err.date';
   if (v.nextActionDate && !isYmd(v.nextActionDate)) e.nextActionDate = 'err.date';
   if (v.nextActionDate && !v.nextAction) e.nextAction = 'err.action_needed';

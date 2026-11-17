@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import DICT from '../../growth/public/js/i18n/dict.js';
 import { STATUSES, COUNTRIES, PROBLEM_TAGS, FEATURE_TAGS, METHOD_TAGS, REFUSAL_TAGS, INTEREST_TAGS, FREQUENCIES, REACTIONS, WILLINGNESS, COMMITMENT_LEVELS, ACTIVITY_KINDS } from '../../growth/public/js/domain/constants.js';
 import { TEMPLATE_IDS } from '../../growth/public/js/domain/templates.js';
+import { IMPORT_COLUMNS, REASONS } from '../../growth/public/js/domain/importCsv.js';
 
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : [p]; });
 
@@ -36,6 +37,7 @@ test('familles de clés dynamiques complètes', () => {
     ...['overdue', 'today', 'replies', 'demos', 'unplanned'].flatMap((x) => [`rem.${x}`, `rem.${x}_hint`]),
     ...['all', 'fr', 'en', 'other'].map((x) => `segf.${x}`), ...['fr', 'en', 'other'].map((x) => `seg.${x}`), ...['all', 'overdue', 'today', 'none'].map((x) => `actf.${x}`), ...['added', 'firm', 'next', 'status'].map((x) => `sort.${x}`),
     ...['no_send', 'no_scrape', 'no_linkedin', 'no_network', 'local_only', 'no_auth', 'no_encrypt', 'gdpr'].map((x) => `limit.${x}`),
+    ...IMPORT_COLUMNS.map((x) => `imp.col.${x}`), ...REASONS.map((x) => `imp.reason.${x}`), ...['empty', 'too_large', 'too_many_rows', 'unterminated_quote', 'missing_columns', 'duplicate_columns', 'no_rows', 'bad_type'].map((x) => `imp.err.${x}`), ...[1, 2, 3, 4, 5, 6, 7].map((x) => `imp.rule${x}`),
     ...['dashboard', 'prospects', 'reminders', 'templates', 'interviews', 'analysis', 'settings'].map((x) => `nav.${x}`), 'lang.fr', 'lang.en',
   ];
   assert.deepEqual(keys.filter((k) => !(k in DICT)), []);

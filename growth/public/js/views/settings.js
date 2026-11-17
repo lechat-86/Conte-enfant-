@@ -41,6 +41,9 @@ export function render({ store, state }) {
           <button class="btn" data-action="set-export" data-what="notes-txt">${icon('download')}${t('export.notes_txt')}</button>
           <button class="btn btn-primary" data-action="set-export" data-what="backup">${icon('download')}${t('export.backup')}</button>
         </div>
+        <h3 class="mini-title">${t('imp.button')} (CSV)</h3>
+        <a class="btn" href="#/import">${icon('upload')}${t('imp.button')}</a>
+        <p class="hint">${t('imp.settings_hint')}</p>
         <h3 class="mini-title">${t('set.import_title')}</h3>
         <label class="btn file-btn">${icon('upload')}${t('set.import')}<input type="file" accept=".json,application/json" data-change="import-backup"></label>
         <p class="hint">${t('set.import_hint')}</p>

@@ -18,6 +18,7 @@ import * as templates from './views/templates.js';
 import * as interviews from './views/interviews.js';
 import * as analysis from './views/analysis.js';
 import * as settings from './views/settings.js';
+import * as importer from './views/import.js';
 
 const routes = [
   { re: /^\/$/, view: dashboard, nav: 'dashboard' },
@@ -25,6 +26,7 @@ const routes = [
   { re: /^\/prospects\/new$/, view: prospectForm, nav: 'prospects' },
   { re: /^\/prospects\/([\w-]+)\/edit$/, keys: ['id'], view: prospectForm, nav: 'prospects' },
   { re: /^\/prospects\/([\w-]+)$/, keys: ['id'], view: prospectDetail, nav: 'prospects' },
+  { re: /^\/import$/, view: importer, nav: 'prospects' },
   { re: /^\/reminders$/, view: reminders, nav: 'reminders' },
   { re: /^\/templates$/, view: templates, nav: 'templates' },
   { re: /^\/interviews$/, view: { render: interviews.listRender }, nav: 'interviews' },

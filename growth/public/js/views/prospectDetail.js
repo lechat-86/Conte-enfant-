@@ -47,6 +47,7 @@ export function render({ store, params, today }) {
             ${dl('prospects.contact_email', p.contactEmail ? h`${p.contactEmail} ${p.emailLegit ? h`<span class="badge b-complete">${t('prospect.email_ok')}</span>` : ''}` : '')}
             ${dl('prospects.website', p.website ? h`<a href="${p.website}" rel="noopener noreferrer nofollow" target="_blank">${p.website}</a>` : '')}
             ${dl('prospects.source_url', p.sourceUrl ? h`<a href="${p.sourceUrl}" rel="noopener noreferrer nofollow" target="_blank">${p.sourceUrl}</a>` : '')}
+            ${dl('prospects.email_source', p.emailSourceUrl ? h`<a href="${p.emailSourceUrl}" rel="noopener noreferrer nofollow" target="_blank">${p.emailSourceUrl}</a>` : '')}${dl('prospects.source_verified', p.sourceVerifiedAt ? fmtDate(p.sourceVerifiedAt) : '')}
             ${dl('prospects.added', fmtDate(p.addedAt))}${dl('prospects.first_contact', p.firstContactAt ? fmtDate(p.firstContactAt) : '')}
             ${dl('prospects.budget_full', p.budgetMonthly != null ? fmtEur(p.budgetMonthly) : '')}
             ${dl('prospects.problems', h`${tagList('problem', p.problems)} ${p.problemsText ? h`<span class="block">${p.problemsText}</span>` : ''}`)}

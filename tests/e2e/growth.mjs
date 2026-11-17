@@ -44,7 +44,7 @@ const noOverflow = async (page, where) => { const px = await page.evaluate(() =>
 const toast = (page) => text(page, '#toast-root');
 const clearDemo = async (page) => { await page.goto(`${BASE}#/settings`); await page.click('[data-action="clear-demo"]'); await page.click('[data-action="clear-demo-ok"]'); await page.waitForSelector('[data-testid="demo-banner"]', { state: 'detached' }); };
 const readDownload = async (dl) => (await readFile(await dl.path(), 'utf8'));
-const ROUTES = ['/', '/prospects', '/prospects/P-001', '/prospects/P-001/edit', '/prospects/new', '/reminders', '/templates', '/interviews', '/interviews/new', '/interviews/I-001', '/analysis', '/settings'];
+const ROUTES = ['/', '/import', '/prospects', '/prospects/P-001', '/prospects/P-001/edit', '/prospects/new', '/reminders', '/templates', '/interviews', '/interviews/new', '/interviews/I-001', '/analysis', '/settings'];
 const addProspect = async (page, v) => {
   await page.goto(`${BASE}#/prospects/new`);
   await page.fill('#f-firm', v.firm); if (v.country) await page.selectOption('#f-country', v.country);
@@ -398,6 +398,217 @@ await test('Paramètres : limites de sécurité affichées, réinitialisation co
   await go('/settings'); await page.click('[data-action="reset-all"]'); await page.click('[data-action="reset-all-ok"]');
   await go('/prospects'); assert.match(await text(page, '.empty'), /Aucun prospect/);
   await go('/settings'); await page.click('[data-action="load-demo"]'); await go('/prospects'); assert.equal(await rows(page, 'prospects-table'), 8);
+});
+
+
+// ───────── Import CSV de prospects ─────────
+const HEAD = 'firm,country,source_url,city,website,contact_name,contact_role,contact_email,email_verified,email_source_url,source_verified_on,status,next_action,next_action_date,budget_monthly_eur,notes';
+const csvRow = (o = {}) => { const d = { firm: '', country: 'FR', source_url: 'https://annuaire.example/x', city: '', website: '', contact_name: '', contact_role: '', contact_email: '', email_verified: '', email_source_url: '', source_verified_on: '2026-01-10', status: '', next_action: '', next_action_date: '', budget_monthly_eur: '', notes: '', ...o }; return HEAD.split(',').map((c) => (/[",\n]/.test(d[c]) ? `"${d[c].replace(/"/g, '""')}"` : d[c])).join(','); };
+const csvFile = (...rows) => ({ name: 'prospects.csv', mimeType: 'text/csv', buffer: Buffer.from(`${HEAD}\r\n${rows.join('\r\n')}\r\n`, 'utf8') });
+const lsState = (page) => page.evaluate(() => localStorage.getItem('readyfile-growth-v1'));
+const chooseCsv = async (page, f) => { await page.goto(`${BASE}#/import`); await page.waitForSelector('[data-testid="imp-file"]', { state: 'attached' }); await page.setInputFiles('[data-testid="imp-file"]', f); };
+const MIXED = () => csvFile(
+  csvRow({ firm: 'Cabinet Nouveau Un', country: 'FR', city: 'Dijon', website: 'https://nouveau-un.example', source_url: 'https://annuaire.example/n1', notes: 'Cabinet indépendant (source : page À propos)' }),
+  csvRow({ firm: 'New Practice Two', country: 'GB', city: 'Leeds', website: 'https://new-two.example', source_url: 'https://directory.example/n2', contact_name: 'Jane Doe', contact_email: 'info@new-two.example', email_verified: 'yes', email_source_url: 'https://new-two.example/contact' }),
+  csvRow({ firm: 'Cabinet Exemple Alpha', country: 'FR', website: '', source_url: 'https://annuaire.example/dup1' }),            // doublon existant (nom + pays)
+  csvRow({ firm: 'Autre Nom Total', country: 'GB', website: 'https://www.fictional-accountants-ltd.example', source_url: 'https://d.example/x' }), // placeholder, ajusté plus bas
+  csvRow({ firm: 'Sans Source', country: 'FR', website: 'https://sans-source.example', source_url: '' }),
+  csvRow({ firm: 'Email Deviné', country: 'FR', website: 'https://devine.example', contact_email: 'contact@devine.example' }),
+  csvRow({ firm: 'Email Perso', country: 'FR', website: 'https://perso.example', contact_email: 'jean@gmail.com', email_verified: 'yes', email_source_url: 'https://perso.example/c' }),
+  csvRow({ firm: 'Pays Inconnu', country: 'XX', website: 'https://xx.example' }),
+  csvRow({ firm: 'Cabinet Nouveau Un', country: 'FR', website: '', source_url: 'https://annuaire.example/n1bis' }),                 // doublon dans le fichier
+  csvRow({ firm: 'Statut Interdit', country: 'FR', website: 'https://interdit.example', status: 'paying' }),
+);
+
+await test('Import CSV : bouton, format exact affiché, modèle téléchargeable sans ligne exemple', async ({ page, go }) => {
+  await go('/prospects');
+  assert.match(await text(page, '[data-testid="import-btn"]'), /Importer des prospects/);
+  await page.click('[data-testid="import-btn"]'); await page.waitForSelector('[data-testid="imp-format"]');
+  assert.equal(await rows(page, 'imp-format'), 16);
+  const fmt = await text(page, '[data-testid="imp-format"]');
+  for (const c of ['firm', 'country', 'source_url', 'contact_email', 'email_verified', 'email_source_url']) assert.ok(fmt.includes(c), c);
+  assert.equal(await page.locator('[data-testid="imp-format"] .badge').count(), 3, '3 colonnes obligatoires');
+  assert.match(await text(page, 'main'), /Prévisualisation obligatoire[\s\S]*Ajout seul[\s\S]*Doublon[\s\S]*URL source obligatoire[\s\S]*jamais accepté sans vérification/);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="imp-template"]')]);
+  assert.equal((await readDownload(dl)).replace('﻿', ''), `${HEAD}\r\n`);
+  await go('/settings'); assert.match(await text(page, 'main'), /Importer des prospects/);
+});
+
+await test('Import CSV : prévisualisation (valides / refusés / motifs), RIEN n\'est ajouté avant confirmation', async ({ page }) => {
+  await page.goto(`${BASE}#/prospects`); await page.waitForSelector('#main');
+  const before = await lsState(page);
+  await chooseCsv(page, MIXED());
+  await page.waitForSelector('[data-testid="imp-table"]');
+  assert.equal(await text(page, '[data-testid="imp-n-valid"]'), '2');
+  assert.equal(await text(page, '[data-testid="imp-n-refused"]'), '8');
+  assert.equal(await rows(page, 'imp-table'), 10);
+  assert.equal(await lsState(page), before, 'stockage octet pour octet identique : aucun ajout automatique');
+  const reason = async (line) => page.locator(`tr[data-line="${line}"] [data-reason]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-reason')));
+  assert.deepEqual(await reason(4), ['duplicate_existing']);
+  assert.match(await text(page, 'tr[data-line="4"]'), /P-001 — Cabinet Exemple Alpha/);
+  assert.deepEqual(await reason(6), ['missing_source_url']);
+  assert.deepEqual(await reason(7), ['email_unverified']);
+  assert.deepEqual(await reason(8), ['email_free_provider']);
+  assert.deepEqual(await reason(9), ['invalid_country']);
+  assert.deepEqual(await reason(10), ['duplicate_in_file']);
+  assert.deepEqual(await reason(11), ['status_not_allowed']);
+  assert.match(await text(page, '[data-testid="imp-summary"]'), /10\s+lignes lues[\s\S]*2\s+prêtes à importer[\s\S]*8\s+refusées/);
+  assert.match(await text(page, '[data-testid="imp-import"]'), /Importer 2 prospect/);
+  assert.match(await text(page, 'main'), /rien n’est encore ajouté/i);
+  // annuler : toujours rien de modifié
+  await page.click('[data-action="imp-reset"]');
+  assert.equal(await lsState(page), before);
+});
+
+await test('Import CSV : confirmation, importés / refusés affichés, AUCUNE perte de données, rien d\'envoyé', async ({ page, go }) => {
+  await page.goto(`${BASE}#/prospects`); await page.waitForSelector('#main');
+  const snapBefore = JSON.parse(await lsState(page));
+  await chooseCsv(page, MIXED()); await page.waitForSelector('[data-testid="imp-table"]');
+  await page.click('[data-testid="imp-import"]');
+  assert.match(await text(page, '[data-testid="imp-confirm-text"]'), /2 prospect\(s\) vont être AJOUTÉS/);
+  assert.match(await text(page, '.modal'), /Aucun prospect existant n’est modifié ni supprimé/);
+  await page.click('.modal [data-action="modal-close"] >> nth=-1');   // annuler la confirmation
+  assert.deepEqual(JSON.parse(await lsState(page)).prospects, snapBefore.prospects, 'annuler la confirmation n\'ajoute rien');
+  await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]');
+  await page.waitForSelector('[data-testid="imp-done"]');
+  assert.equal(await text(page, '[data-testid="imp-done-imported"]'), '2');
+  assert.equal(await text(page, '[data-testid="imp-done-refused"]'), '8');
+  const after = JSON.parse(await lsState(page));
+  // ── aucune perte : tout l'existant est identique, dans le même ordre ──
+  assert.deepEqual(after.prospects.slice(0, 8), snapBefore.prospects);
+  assert.deepEqual(after.activities.slice(0, snapBefore.activities.length), snapBefore.activities);
+  assert.deepEqual(after.interviews, snapBefore.interviews);
+  assert.deepEqual(after.goals, snapBefore.goals);
+  assert.equal(after.prospects.length, 10);
+  const [a, b] = after.prospects.slice(8);
+  assert.deepEqual([a.id, a.firm, a.country, a.city, a.status, a.demo, a.firstContactAt], ['P-009', 'Cabinet Nouveau Un', 'FR', 'Dijon', 'to_research', false, '']);
+  assert.equal(a.sourceUrl, 'https://annuaire.example/n1'); assert.equal(a.sourceVerifiedAt, '2026-01-10'); assert.equal(a.contactEmail, '');
+  assert.deepEqual([b.contactEmail, b.emailSourceUrl, b.emailLegit], ['info@new-two.example', 'https://new-two.example/contact', true]);
+  // aucun message envoyé / réponse / démo créé ; KPI inchangés sauf le total
+  await go('/');
+  assert.equal(await kpi(page, 'kpi-total'), '10'); assert.equal(await kpi(page, 'kpi-messages'), '6'); assert.equal(await kpi(page, 'kpi-replies'), '5');
+  assert.equal(await kpi(page, 'kpi-demos'), '2'); assert.equal(await kpi(page, 'kpi-paying'), '0'); assert.equal(await kpi(page, 'kpi-intents'), '1');
+  await go('/prospects/P-009'); assert.match(await text(page, 'main'), /Cabinet Nouveau Un/); assert.match(await text(page, '.timeline'), /Import CSV « prospects\.csv » — ligne 2/);
+  await go('/prospects/P-010'); assert.match(await text(page, 'main'), /Source publique de l’e-mail[\s\S]*new-two\.example\/contact/);
+  await go('/prospects/P-001'); assert.match(await text(page, 'main'), /Cabinet Exemple Alpha/); // existant intact
+});
+
+await test('Import CSV : sélection par ligne, désélection totale, import partiel', async ({ page, go }) => {
+  await chooseCsv(page, MIXED()); await page.waitForSelector('[data-testid="imp-table"]');
+  await page.click('[data-action="imp-none"]');
+  assert.ok(await page.locator('[data-testid="imp-import"]').isDisabled()); assert.match(await text(page, 'main'), /Aucune ligne sélectionnée/);
+  await page.check('tr[data-line="3"] input[type="checkbox"]');
+  assert.match(await text(page, '[data-testid="imp-import"]'), /Importer 1 prospect/);
+  assert.equal(await page.locator('tr[data-status="refused"] input[type="checkbox"]').count(), 0, 'on ne peut pas sélectionner une ligne refusée');
+  await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]'); await page.waitForSelector('[data-testid="imp-done"]');
+  assert.equal(await text(page, '[data-testid="imp-done-imported"]'), '1');
+  assert.match(await text(page, '[data-testid="imp-done"]'), /1\s+ligne\(s\) valides non sélectionnées/);
+  await go('/prospects'); assert.equal(await rows(page, 'prospects-table'), 9);
+  await page.fill('#p-q', 'new practice'); assert.equal(await rows(page, 'prospects-table'), 1);
+  await page.fill('#p-q', 'cabinet nouveau un'); assert.match(await text(page, '.empty'), /Aucun prospect ne correspond/, 'la ligne désélectionnée n\'a pas été ajoutée');
+});
+
+await test('Import CSV : rapport des lignes refusées (téléchargement, contenu, réimportable une fois corrigé)', async ({ page }) => {
+  await chooseCsv(page, MIXED()); await page.waitForSelector('[data-testid="imp-table"]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-testid="imp-report"]')]);
+  assert.match(dl.suggestedFilename(), /^readyfile-growth-import-refuses-.*\.csv$/);
+  const rep = (await readDownload(dl)).replace('﻿', '');
+  const lines = rep.trim().split('\r\n');
+  assert.equal(lines[0], `line_number,${HEAD},refusal_reasons,refusal_text`);
+  assert.equal(lines.length, 9, 'en-tête + 8 lignes refusées');
+  assert.ok(lines.some((l) => l.startsWith('4,Cabinet Exemple Alpha') && l.includes('duplicate_existing')));
+  assert.ok(lines.some((l) => l.startsWith('7,Email Deviné') && l.includes('email_unverified') && l.includes('E-mail refusé')));
+  assert.ok(!rep.includes('Cabinet Nouveau Un,FR,https://annuaire.example/n1,Dijon'), 'les lignes valides ne sont pas dans le rapport');
+  // le rapport lui-même est réimportable (corrigé) : colonnes reconnues, aucune « colonne ignorée »
+  await page.click('[data-action="imp-reset"]'); await page.waitForSelector('[data-testid="imp-file"]', { state: 'attached' });
+  await page.setInputFiles('[data-testid="imp-file"]', { name: 'refuses.csv', mimeType: 'text/csv', buffer: Buffer.from(rep) });
+  await page.waitForSelector('[data-testid="imp-table"]');
+  assert.equal(await page.locator('[data-testid="imp-ignored"]').count(), 0);
+  assert.equal(await rows(page, 'imp-table'), 8);
+});
+
+await test('Import CSV : après l\'import, le rapport des refus reste téléchargeable (8 lignes)', async ({ page }) => {
+  await chooseCsv(page, MIXED()); await page.waitForSelector('[data-testid="imp-table"]');
+  await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]'); await page.waitForSelector('[data-testid="imp-done"]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-testid="imp-report"]')]);
+  const lines = (await readDownload(dl)).replace('\uFEFF', '').trim().split('\r\n');
+  assert.equal(lines.length, 9);
+  assert.ok(lines.some((l) => l.startsWith('11,Statut Interdit') && l.includes('status_not_allowed')));
+  assert.ok(!lines.join('\n').includes('Cabinet Nouveau Un,FR,https://annuaire.example/n1,Dijon'));
+});
+
+await test('Import CSV : fichiers invalides — erreurs claires, aucune donnée touchée', async ({ page }) => {
+  await page.goto(`${BASE}#/prospects`); await page.waitForSelector('#main');
+  const before = await lsState(page);
+  const cases = [
+    [{ name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('') }, /fichier est vide/],
+    [{ name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('firm,city\nA,B\n') }, /Colonnes obligatoires absentes : country, source_url/],
+    [{ name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('firm,country,source_url\n') }, /Aucune ligne de données/],
+    [{ name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('firm,country,source_url\n"A,FR,https://a.example') }, /guillemet n’est pas refermé/],
+    [{ name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('firm,country,source_url,firm\nA,FR,https://a.example,B') }, /colonne apparaît deux fois/],
+    [{ name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') }, /Format non accepté/],
+  ];
+  for (const [f, re] of cases) { await chooseCsv(page, f); await page.waitForSelector('[data-testid="imp-error"]'); assert.match(await text(page, '[data-testid="imp-error"]'), re); }
+  assert.equal(await lsState(page), before, 'aucune donnée modifiée par un fichier invalide');
+});
+
+await test('Import CSV : séparateur « ; », BOM, retours à la ligne dans un champ, colonnes inconnues signalées', async ({ page }) => {
+  const txt = '﻿Firm;Country;Source_URL;Notes;id;problems\r\n"Cabinet Point-Virgule";fr;https://annuaire.example/pv;"ligne 1\nligne 2";P-001;missing_documents\r\n';
+  await chooseCsv(page, { name: 'pv.csv', mimeType: 'text/csv', buffer: Buffer.from(txt, 'utf8') });
+  await page.waitForSelector('[data-testid="imp-table"]');
+  assert.equal(await text(page, '[data-testid="imp-n-valid"]'), '1');
+  assert.match(await text(page, '[data-testid="imp-ignored"]'), /id, problems/);
+  await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]'); await page.waitForSelector('[data-testid="imp-done"]');
+  const st = JSON.parse(await lsState(page));
+  const p = st.prospects.at(-1);
+  assert.equal(p.id, 'P-009', 'la colonne id du CSV est ignorée : aucun écrasement possible'); assert.equal(p.notes, 'ligne 1\nligne 2'); assert.deepEqual(p.problems, []);
+  assert.equal(st.prospects.find((x) => x.id === 'P-001').firm, 'Cabinet Exemple Alpha');
+});
+
+await test('Import CSV : « Démarrer avec mes données » puis import — les saisies réelles sont préservées', async ({ page, go }) => {
+  await clearDemo(page);
+  await addProspect(page, { firm: 'Cabinet Réel Saisi', country: 'GB', status: 'contacted', contact: 'Real Person' });
+  await page.click('[data-action="act-open"][data-kind="note"]'); await page.fill('#a-text', 'note réelle à préserver'); await page.click('.modal button[type="submit"]'); await page.waitForSelector('.modal', { state: 'detached' });
+  const before = JSON.parse(await lsState(page));
+  await chooseCsv(page, csvFile(csvRow({ firm: 'Cabinet Réel Saisi', country: 'GB', website: '', notes: 'tentative d\'écrasement' }), csvRow({ firm: 'Vraiment Nouveau', website: 'https://vn.example' })));
+  await page.waitForSelector('[data-testid="imp-table"]');
+  assert.equal(await text(page, '[data-testid="imp-n-valid"]'), '1'); assert.equal(await text(page, '[data-testid="imp-n-refused"]'), '1');
+  await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]'); await page.waitForSelector('[data-testid="imp-done"]');
+  const after = JSON.parse(await lsState(page));
+  assert.deepEqual(after.prospects[0], before.prospects[0], 'le prospect saisi n\'est pas écrasé');
+  assert.deepEqual(after.activities.slice(0, before.activities.length), before.activities);
+  assert.equal(after.prospects.length, 2);
+  await go('/prospects/P-001'); assert.match(await text(page, '.timeline'), /note réelle à préserver/);
+});
+
+await test('Import CSV : la restauration JSON existante est inchangée et fonctionne après un import', async ({ page, go }) => {
+  await chooseCsv(page, csvFile(csvRow({ firm: 'Cabinet Avant Sauvegarde', website: 'https://avant.example' })));
+  await page.waitForSelector('[data-testid="imp-table"]'); await page.click('[data-testid="imp-import"]'); await page.click('[data-testid="imp-confirm-ok"]'); await page.waitForSelector('[data-testid="imp-done"]');
+  await go('/settings');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-what="backup"]')]);
+  const backup = JSON.parse(await readDownload(dl));
+  assert.equal(backup.prospects.length, 9); assert.equal(backup.prospects.at(-1).sourceVerifiedAt, '2026-01-10');
+  const file = await dl.path();
+  const ctx2 = await browser.newContext({ locale: 'fr-FR' }); const p2 = await ctx2.newPage();
+  await p2.goto(`${BASE}#/settings`); await p2.waitForSelector('#main');
+  await p2.setInputFiles('input[data-change="import-backup"]', file);
+  await p2.waitForSelector('#toast-root .toast:has-text("Sauvegarde restaurée : 9 prospect")');
+  await p2.goto(`${BASE}#/prospects`); await p2.fill('#p-q', 'avant sauvegarde'); assert.equal(await rows(p2, 'prospects-table'), 1);
+  await ctx2.close();
+});
+
+await test('Import CSV : sauvegarde avant import, EN, mobile 390 px sans débordement', async ({ page }) => {
+  await chooseCsv(page, MIXED()); await page.waitForSelector('[data-testid="imp-table"]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="imp-backup"]')]);
+  assert.match(dl.suggestedFilename(), /^readyfile-growth-backup-.*\.json$/);
+  await page.locator('.topbar .seg-btn[lang="en"]').click();
+  assert.match(await text(page, '[data-testid="imp-import"]'), /Import 2 prospect/);
+  assert.match(await text(page, '[data-testid="imp-summary"]'), /rows read[\s\S]*ready to import[\s\S]*refused/);
+  assert.match(await text(page, 'tr[data-line="4"]'), /Duplicate of an existing prospect \(not overwritten\)/);
+  await noMissing(page, 'import EN');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await noOverflow(page, 'import preview @390');
+  await page.click('[data-action="imp-reset"]'); await page.waitForSelector('[data-testid="imp-format"]'); await noOverflow(page, 'import start @390');
 });
 
 await test('Langue FR/EN à chaud (sans rechargement) et mémorisée', async ({ page, go }) => {

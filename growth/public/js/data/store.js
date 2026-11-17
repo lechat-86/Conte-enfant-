@@ -4,6 +4,7 @@
 import { SCHEMA_VERSION, DEFAULT_GOALS, STATUSES } from '../domain/constants.js';
 import { validateProspect, validateInterview, validateGoals, validateActivity } from '../domain/validation.js';
 import { ymd } from '../domain/dates.js';
+import { evaluateRecords } from '../domain/importCsv.js';
 import { buildSeed } from './seed.js';
 
 export const KEY = 'readyfile-growth-v1';
@@ -66,6 +67,22 @@ export function createStore({ storage = safeStorage(), codec = identityCodec, cl
       const p = { id, demo: false, ...v.value, addedAt: today() };
       state.prospects.push(p); commit();
       return { ok: true, prospect: p };
+    },
+    /**
+     * Import CSV validé par l'utilisateur. AJOUT SEUL : aucun prospect existant n'est modifié ni supprimé.
+     * Tout est ré-évalué ici (doublons compris) face à l'état courant : l'interface n'est jamais crue sur parole.
+     */
+    importProspects(records, { fileName = '' } = {}) {
+      const rows = evaluateRecords(records, state.prospects, today());
+      const imported = [];
+      for (const r of rows.filter((x) => x.status === 'valid')) {
+        const id = nextId('P', state.prospects.map((p) => p.id));
+        state.prospects.push({ id, demo: false, ...r.value, addedAt: today() });
+        addAct(id, 'note', `Import CSV${fileName ? ` « ${String(fileName).slice(0, 80)} »` : ''} — ligne ${r.line}. Source : ${r.value.sourceUrl}`);
+        imported.push(id);
+      }
+      if (imported.length) commit();
+      return { imported, rows };
     },
     updateProspect(id, input) {
       const p = s.prospect(id); if (!p) return { ok: false, errors: { _: 'err.not_found' } };
