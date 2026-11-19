@@ -9,13 +9,14 @@ a.add_argument("--srt"); a.add_argument("--dur", type=float, default=4.0)
 a.add_argument("clips", nargs="+"); n = a.parse_args()
 tmp = tempfile.mkdtemp(); parts = []
 for i, c in enumerate(n.clips):
+    c, _, d = c.partition("@"); dur = float(d) if d else n.dur
     o = f"{tmp}/p{i}.mp4"; vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,format=yuv420p"
     if c.lower().endswith((".jpg",".jpeg",".png",".webp")):
-        fr = int(n.dur*30)
+        fr = int(dur*30)
         vf = f"scale=2160:3840:force_original_aspect_ratio=increase,crop=2160:3840,zoompan=z='min(zoom+0.0008,1.12)':d={fr}:s=1080x1920:fps=30,format=yuv420p"
-        cmd = ["ffmpeg","-y","-loglevel","error","-i",c,"-vf",vf,"-t",str(n.dur),"-c:v","libx264","-crf","17",o]
+        cmd = ["ffmpeg","-y","-loglevel","error","-i",c,"-vf",vf,"-t",str(dur),"-c:v","libx264","-crf","17",o]
     else:
-        cmd = ["ffmpeg","-y","-loglevel","error","-i",c,"-vf",vf,"-t",str(n.dur),"-an","-c:v","libx264","-crf","17",o]
+        cmd = ["ffmpeg","-y","-loglevel","error","-i",c,"-vf",vf,"-t",str(dur),"-an","-c:v","libx264","-crf","17",o]
     subprocess.run(cmd, check=True); parts.append(o)
 lst = f"{tmp}/l.txt"; open(lst,"w").write("".join(f"file '{p}'\n" for p in parts))
 cat = f"{tmp}/cat.mp4"
