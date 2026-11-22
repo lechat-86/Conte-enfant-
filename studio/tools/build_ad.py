@@ -6,6 +6,7 @@ import json
 HERE = pathlib.Path(sys.argv[1]).resolve(); VAR=sys.argv[2]; MODEL = pathlib.Path(sys.argv[3]); CFG=json.load(open(HERE/f"config_{VAR}.json"))
 W, H = 1080, 1920; CREAM=(251,240,220); RED=(224,80,47); DARK=(60,40,35)
 F = lambda w,s: ImageFont.truetype(f"/usr/share/fonts/opentype/inter/Inter-{w}.otf", s)
+CREAM=tuple(CFG.get("bg",CREAM)); RED=tuple(CFG.get("accent",RED)); BLOB=tuple(CFG.get("blob",(246,226,190)))
 src = Image.open(HERE/"photos_reference"/CFG["src"]).convert("RGB")
 page=src.crop(tuple(CFG["page"])); title=src.crop(tuple(CFG["title"])); top=src.crop(tuple(CFG["top"]))
 SC=CFG["scenes"]
@@ -25,7 +26,7 @@ def card(img,w):
     return sh,im,m
 def frame(kind,text,i):
     c=Image.new("RGB",(W,H),CREAM); d=ImageDraw.Draw(c)
-    d.ellipse((600,-250,1300,450),fill=(246,226,190)); d.ellipse((-300,1500,400,2200),fill=(246,226,190))
+    d.ellipse((600,-250,1300,450),fill=BLOB); d.ellipse((-300,1500,400,2200),fill=BLOB)
     big = kind in("hook","pb","cta")
     f=F("ExtraBold",82 if kind!="cta" and big else (66 if kind=="cta" else 62)); ls=wrap(d,text,f,900)
     y=150 if kind!="cta" else 1000
