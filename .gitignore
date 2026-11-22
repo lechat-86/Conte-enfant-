@@ -1,1 +1,5 @@
 historique_ordres.csv
+donnees_btc_eur.csv
+etat_simulation.json
+*.tmp
+__pycache__/
