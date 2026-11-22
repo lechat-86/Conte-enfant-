@@ -1,3 +1,6 @@
+# CORRECTION : le minimum Etsy Ads affiché dans l'application du propriétaire est 5 $/jour (environ 150 $/mois), pas 1 €.
+# Décision recommandée : NE PAS activer pour l'instant. Priorité : titres/tags FR + 1 vidéo/semaine. Test pub éventuel : 3-5 jours sur 1 seule fiche.
+
 # Plan Etsy Ads à 1 € par jour (hypothèse — à confirmer)
 Budget : ~30 € / mois. Les pubs Etsy se facturent au clic, pas à l'affichage. Je ne peux pas les activer : action humaine dans Etsy.
 
