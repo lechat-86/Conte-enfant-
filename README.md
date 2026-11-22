@@ -32,13 +32,14 @@ Le serveur n'écoute que sur `127.0.0.1`. Les données de démonstration sont st
 4. **Analyse documentaire** : les 6 scénarios, contrôles, données extraites (simulées), « Exécuter les scénarios ».
 5. **Portail client** (bouton « Ouvrir le portail client » d'un dossier, ou `#/portal/demo-dos-003`) : déposer un fichier fictif en choisissant le scénario, voir la raison du refus et la progression.
 6. **Offres & tarifs** : 49 / 99 / 199 € (≈ $), calculateur de revenus récurrents vers 10 000 €/mois.
-7. Basculez **FR ↔ EN** à tout moment (sans rechargement).
+7. **Paramètres → Sauvegarde et export** : téléchargez une sauvegarde JSON complète, restaurez-la (sauvegarde de l'état actuel obligatoire + confirmation explicite, aucune fusion) ou exportez le suivi en CSV pour Excel (`;` en FR, `,` en EN).
+8. Basculez **FR ↔ EN** à tout moment (sans rechargement).
 
 ## Tests
 
 ```bash
-npm test            # 170 tests unitaires (node:test) — logique métier, relances, i18n, store, données
-npm run test:e2e    # 34 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, relances, mobile, tablette
+npm test            # 191 tests unitaires (node:test) — logique métier, relances, sauvegarde/CSV, i18n, store, données
+npm run test:e2e    # 44 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, relances, sauvegarde/restauration/CSV, mobile, tablette
 npm run test:growth # 31 tests navigateur de l'outil interne GROWTH
 npm run test:all
 ```

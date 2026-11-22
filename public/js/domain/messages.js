@@ -35,7 +35,9 @@ function itemText(item, period, lang) {
     detected: d.detectedType ? t(`doc.${d.detectedType}`, {}, lang) : '',
     detectedPeriod: d.detectedPeriod ? (DOC_TYPES[item.type]?.granularity === 'year' ? fmtYear(d.detectedPeriod) : fmtPeriod(d.detectedPeriod, lang)) : '',
   };
-  return item.kind === 'missing' ? t('msg.item.missing', params, lang) : t(`msg.item.${item.code}`, params, lang);
+  // Pièce sans période (identité, Kbis, assurance) : variante sans parenthèses, sinon on obtenait « Document manquant : X (). »
+  if (item.kind === 'missing') return t(per ? 'msg.item.missing' : 'msg.item.missing_noperiod', params, lang);
+  return t(`msg.item.${item.code}`, params, lang);
 }
 
 /**

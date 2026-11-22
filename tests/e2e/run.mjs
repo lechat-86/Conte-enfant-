@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createServer } from '../../server.js';
 
 const require = createRequire(import.meta.url);
@@ -731,6 +732,219 @@ await test('Menu : aria-current="page" valide (exactement « page », une seule 
   await go('/dossiers/DOS-007');
   assert.equal(await page.locator('nav a[aria-current="page"]').innerText(), 'Dossiers', 'une fiche dossier garde « Dossiers » actif');
 });
+
+
+// ---- Sauvegarde, restauration, export CSV ----------------------------------------------------------
+const KEY = 'readyfile-ai-demo';
+const ls = (page) => page.evaluate((k) => localStorage.getItem(k), KEY);
+const backupJson = (name, obj) => ({ name, mimeType: 'application/json', buffer: Buffer.from(typeof obj === 'string' ? obj : JSON.stringify(obj)) });
+async function downloadVia(page, selector) {
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click(selector)]);
+  return { name: dl.suggestedFilename(), bytes: readFileSync(await dl.path()) };
+}
+async function sampleBackup(page, go) {
+  await go('/settings');
+  const { bytes } = await downloadVia(page, 'button[data-action="backup-download"]');
+  return bytes.toString('utf8');
+}
+
+await test('Sauvegarde : téléchargement JSON complet (nom daté, enveloppe, données, aucune autre clé)', async ({ page, go }) => {
+  await go('/');
+  await page.evaluate(() => localStorage.setItem('readyfile-growth-v1', 'SENTINELLE'));
+  await go('/settings');
+  assert.match(await text(page, '[data-testid="backup-card"] h2'), /Sauvegarde et export/);
+  assert.match(await text(page, '[data-testid="backup-card"]'), /en clair/, 'avertissement de confidentialité');
+  const { name, bytes } = await downloadVia(page, 'button[data-action="backup-download"]');
+  assert.match(name, /^readyfile-ai-sauvegarde-\d{4}-\d{2}-\d{2}\.json$/);
+  const j = JSON.parse(bytes.toString('utf8'));
+  assert.deepEqual([j.app, j.format, j.formatVersion], ['readyfile-ai', 'readyfile-ai-backup', 1]);
+  assert.equal(j.data.clients.length, 8);
+  assert.equal(j.data.dossiers.length, 12);
+  assert.ok(!bytes.toString('utf8').includes('SENTINELLE'));
+  assert.deepEqual(j.data, JSON.parse(await ls(page)), 'la sauvegarde contient exactement l’état stocké');
+});
+
+await test('Export CSV : FR (« ; », accents, BOM UTF-8) puis EN (« , »)', async ({ page, go }) => {
+  await go('/settings');
+  assert.match(await text(page, '[data-testid="backup-card"] .hint'), /Séparateur « ; »/);
+  const fr = await downloadVia(page, 'button[data-action="csv-export"]');
+  assert.match(fr.name, /^readyfile-ai-suivi-\d{4}-\d{2}-\d{2}\.csv$/);
+  assert.deepEqual([...fr.bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'BOM UTF-8 pour Excel');
+  const t1 = fr.bytes.toString('utf8').slice(1);
+  const lines = t1.split('\r\n');
+  assert.match(lines[0], /^Dossier;Société cliente;Contact client;E-mail;Pays;Modèle;Période;Création;Échéance;En retard;Statut/);
+  assert.match(t1, /DOS-008;Olivar Foods SL;/);
+  assert.match(t1, /À corriger/);
+  assert.match(t1, /Extrait Kbis \| Attestation d'assurance \| Relevé bancaire/);
+  assert.equal(lines.filter(Boolean).length, 13); // en-tête + 12 dossiers
+  await page.locator('.seg-btn[lang="en"]').first().click();
+  assert.match(await text(page, '[data-testid="backup-card"] .hint'), /Separator “,”/);
+  const en = await downloadVia(page, 'button[data-action="csv-export"]');
+  const t2 = en.bytes.toString('utf8').slice(1);
+  assert.match(t2.split('\r\n')[0], /^File,Client company,Client contact,Email,Country,Template,Period,Created,Due date,Overdue,Status/);
+  assert.match(t2, /DOS-008,Olivar Foods SL,/);
+  assert.match(t2, /Company registration extract \| Insurance certificate \| Bank statement/);
+});
+
+await test('Restauration : sauvegarde obligatoire de l’état actuel, confirmation explicite, remplacement complet', async ({ page, go }) => {
+  const backupA = await sampleBackup(page, go); // état d'origine : 8 clients
+  // on modifie l'état local : un client de plus
+  await page.evaluate((k) => {
+    const st = JSON.parse(localStorage.getItem(k));
+    st.clients.push({ id: 'CLI-099', company: 'Client temporaire', contact: 'Zoé Test', email: 'z@t.example', country: 'FR', language: 'fr', createdAt: new Date().toISOString() });
+    localStorage.setItem(k, JSON.stringify(st));
+  }, KEY);
+  await page.reload();
+  await page.waitForSelector('#main');
+  const before = await ls(page);
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('sauvegarde.json', backupA));
+  await page.waitForSelector('.modal');
+  assert.match(await text(page, '.modal h2'), /Restaurer cette sauvegarde/);
+  assert.match(await text(page, '[data-testid="restore-file-info"]'), /8 client\(s\), 12 dossier\(s\)/);
+  assert.match(await text(page, '[data-testid="restore-current-info"]'), /9 client\(s\), 12 dossier\(s\)/);
+  // verrouillé tant que l'état actuel n'est pas sauvegardé
+  assert.ok(await page.locator('[data-action="restore-confirm"]').isDisabled());
+  assert.ok(await page.locator('[data-change="restore-ack"]').isDisabled());
+  // contournement forcé : le bouton est activé de force, la restauration reste refusée
+  await page.evaluate(() => document.querySelector('[data-action="restore-confirm"]').removeAttribute('disabled'));
+  await page.click('[data-action="restore-confirm"]', { force: true });
+  assert.equal(await ls(page), before, 'aucun remplacement sans sauvegarde de l’état actuel');
+  // étape 1 : la sauvegarde de l'état ACTUEL est bien téléchargée
+  const safety = await downloadVia(page, '[data-action="restore-step1"]');
+  assert.match(safety.bytes.toString('utf8'), /Client temporaire/);
+  await page.waitForSelector('[data-testid="restore-step1-done"]');
+  assert.ok(await page.locator('[data-action="restore-confirm"]').isDisabled(), 'case à cocher encore requise');
+  await page.check('[data-change="restore-ack"]');
+  assert.ok(await page.locator('[data-action="restore-confirm"]').isEnabled());
+  await page.click('[data-action="restore-confirm"]');
+  await page.waitForSelector('.modal', { state: 'detached' });
+  assert.match(await text(page, '#toast-root'), /Données restaurées : 8 client\(s\), 12 dossier\(s\)/);
+  const after = JSON.parse(await ls(page));
+  assert.equal(after.clients.length, 8);
+  assert.ok(!JSON.stringify(after).includes('Client temporaire'), 'remplacement complet, sans fusion');
+  assert.deepEqual(after, JSON.parse(backupA).data);
+  await go('/clients');
+  assert.equal(await rows(page, 'clients-table'), 8);
+  assert.ok(!(await text(page, 'main')).includes('Client temporaire'));
+});
+
+await test('Restauration : annuler / Échap / fermer ne change rien', async ({ page, go }) => {
+  const backupA = await sampleBackup(page, go);
+  const before = await ls(page);
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA));
+  await page.waitForSelector('.modal');
+  await page.click('.modal [data-action="modal-close"]:has-text("Annuler")');
+  assert.equal(await page.locator('.modal').count(), 0);
+  assert.equal(await ls(page), before);
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA)); // même fichier : re-sélectionnable
+  await page.waitForSelector('.modal');
+  await downloadVia(page, '[data-action="restore-step1"]');
+  await page.check('[data-change="restore-ack"]');
+  await page.keyboard.press('Escape'); // même après sauvegarde + case cochée : fermer = ne rien remplacer
+  assert.equal(await page.locator('.modal').count(), 0);
+  assert.equal(await ls(page), before);
+  // la modale suivante repart de zéro (pas de case précochée)
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA));
+  await page.waitForSelector('.modal');
+  assert.ok(await page.locator('[data-action="restore-confirm"]').isDisabled());
+});
+
+await test('Restauration : si le téléchargement de la sauvegarde échoue, la restauration est BLOQUÉE', async ({ page, go }) => {
+  const backupA = await sampleBackup(page, go);
+  const before = await ls(page);
+  await page.evaluate(() => { window.__orig = URL.createObjectURL; URL.createObjectURL = () => { throw new Error('téléchargement bloqué'); }; });
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA));
+  await page.waitForSelector('.modal');
+  await page.click('[data-action="restore-step1"]');
+  assert.match(await text(page, '[data-testid="restore-dl-error"]'), /téléchargement a échoué/);
+  assert.match(await text(page, '[data-testid="restore-dl-error"]'), /Restauration bloquée/);
+  assert.equal(await page.locator('[data-testid="restore-step1-done"]').count(), 0);
+  assert.ok(await page.locator('[data-change="restore-ack"]').isDisabled());
+  assert.ok(await page.locator('[data-action="restore-confirm"]').isDisabled());
+  await page.evaluate(() => document.querySelector('[data-action="restore-confirm"]').removeAttribute('disabled'));
+  await page.click('[data-action="restore-confirm"]', { force: true });
+  assert.equal(await ls(page), before, 'rien n’est remplacé');
+  // une fois le téléchargement rétabli, on peut réessayer
+  await page.evaluate(() => { URL.createObjectURL = window.__orig; });
+  await downloadVia(page, '[data-action="restore-step1"]');
+  await page.waitForSelector('[data-testid="restore-step1-done"]');
+  assert.equal(await page.locator('[data-testid="restore-dl-error"]').count(), 0);
+});
+
+await test('Fichiers invalides : message clair (FR puis EN), aucune modale, aucune donnée touchée', async ({ page, go }) => {
+  const good = JSON.parse(await sampleBackup(page, go));
+  const before = await ls(page);
+  const broken = JSON.parse(JSON.stringify(good));
+  broken.data.dossiers[0].clientId = 'CLI-999';
+  const cases = [
+    ['vide.json', '', /Le fichier est vide/, /file is empty/],
+    ['texte.json', 'Bonjour, ceci n’est pas du JSON', /n’est pas une sauvegarde valide/, /not a valid backup/],
+    ['autre-outil.json', { version: 1, prospects: [{ id: 'P-1' }], interviews: [] }, /ne provient pas de READYFILE AI/, /does not come from READYFILE AI/],
+    ['trop-recent.json', { ...good, formatVersion: 99 }, /version plus récente/, /newer version/],
+    ['incoherent.json', broken, /incomplète ou incohérente \(problème détecté : data\.dossiers\[0\]\.clientId\)/, /incomplete or inconsistent \(problem found: data\.dossiers\[0\]\.clientId\)/],
+  ];
+  for (const lang of ['fr', 'en']) {
+    if (lang === 'en') await page.locator('.seg-btn[lang="en"]').first().click();
+    for (const [name, content, reFr, reEn] of cases) {
+      await page.setInputFiles('[data-testid="backup-file"]', backupJson(name, content));
+      await page.waitForSelector('[data-testid="backup-error"]');
+      assert.match(await text(page, '[data-testid="backup-error"]'), lang === 'fr' ? reFr : reEn, `${name} (${lang})`);
+      assert.match(await text(page, '[data-testid="backup-error"]'), lang === 'fr' ? /Rien n’a été modifié/ : /Nothing was changed/);
+      assert.equal(await page.locator('.modal').count(), 0, `${name} : pas de modale`);
+      assert.equal(await ls(page), before, `${name} : données intactes`);
+    }
+  }
+  await noMissingKeys(page, 'settings erreurs');
+});
+
+await test('Fichier trop volumineux (> 10 Mo) : refusé sans être lu', async ({ page, go }) => {
+  await go('/settings');
+  const before = await ls(page);
+  await page.setInputFiles('[data-testid="backup-file"]', { name: 'gros.json', mimeType: 'application/json', buffer: Buffer.alloc(10 * 1024 * 1024 + 10, 32) });
+  await page.waitForSelector('[data-testid="backup-error"]');
+  assert.match(await text(page, '[data-testid="backup-error"]'), /trop volumineux/);
+  assert.equal(await ls(page), before);
+});
+
+await test('Indépendance : sauvegarde + restauration ne touchent à aucune autre clé de stockage', async ({ page, go }) => {
+  await go('/');
+  await page.evaluate(() => localStorage.setItem('readyfile-growth-v1', JSON.stringify({ prospects: [{ id: 'P-1', name: 'Cabinet témoin' }] })));
+  const sentinel = await page.evaluate(() => localStorage.getItem('readyfile-growth-v1'));
+  const backupA = await sampleBackup(page, go);
+  assert.ok(!backupA.includes('Cabinet témoin'));
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA));
+  await page.waitForSelector('.modal');
+  await downloadVia(page, '[data-action="restore-step1"]');
+  await page.check('[data-change="restore-ack"]');
+  await page.click('[data-action="restore-confirm"]');
+  await page.waitForSelector('.modal', { state: 'detached' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('readyfile-growth-v1')), sentinel);
+  // le produit ne sert rien de l'autre outil
+  assert.equal((await page.request.get(`${BASE}growth/public/index.html`)).status(), 404);
+});
+
+await test('Messages préparés : plus de parenthèses vides « () » (FR et EN)', async ({ page, go }) => {
+  await go('/dossiers/DOS-008');
+  await page.click('button[data-action="open-assistant"]:not([data-slot])');
+  for (const lang of ['fr', 'en']) {
+    await page.click(`button[data-action="msg-lang"][data-lang="${lang}"]`);
+    const msg = await page.locator('#msg-text').inputValue();
+    assert.ok(!/\(\s*\)/.test(msg), `() dans le message ${lang} : ${msg}`);
+    assert.match(msg, lang === 'fr' ? /• Document manquant : Extrait Kbis\./ : /• Missing document: Company registration extract\./);
+  }
+});
+
+await test('Sauvegarde (mobile 390 px) : carte, modale de restauration et erreurs sans débordement', async ({ page, go }) => {
+  const backupA = await sampleBackup(page, go);
+  await noOverflow(page, 'settings @390');
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('x.json', 'pas du json'));
+  await page.waitForSelector('[data-testid="backup-error"]');
+  await noOverflow(page, 'settings erreur @390');
+  await page.setInputFiles('[data-testid="backup-file"]', backupJson('s.json', backupA));
+  await page.waitForSelector('.modal');
+  await noOverflow(page, 'modale restauration @390');
+  assert.ok(await page.locator('[data-action="restore-step1"]').isVisible());
+}, { viewport: { width: 390, height: 844 }, mobile: true });
 
 await test('Tablette (820 px) : pas de débordement sur toutes les pages', async ({ page, go }) => {
   for (const r of ROUTES) { await go(r); await noOverflow(page, `${r} @820`); }

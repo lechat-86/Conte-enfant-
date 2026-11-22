@@ -19,6 +19,7 @@ public/
       rules.js               règles de décision (lisibilité, type, doublon, période, pages)
       dossier.js             statuts, complétion, interventions, création
       stats.js               statistiques du tableau de bord
+      backup.js              sauvegarde JSON (enveloppe, validation stricte), export CSV Excel
       followups.js           file de relances : priorité, tri, filtres, dernière relance préparée
       messages.js            génération des messages client FR/EN
       validation.js          validation des formulaires (clés d'erreur i18n)
@@ -30,11 +31,11 @@ public/
       seed.js                jeu de démonstration (100 % fictif)
       store.js               état + persistance localStorage + actions métier
     core/                    html.js (templates échappés), i18n.js, format.js, actions.js, bus.js
-    i18n/                    fr.js, en.js (522 clés chacune, parité testée)
-    ui/                      composants, graphiques SVG/CSS, modales, toasts, icônes
+    i18n/                    fr.js, en.js (578 clés chacune, parité testée)
+    ui/                      download.js (téléchargement local d'un fichier), composants, graphiques SVG/CSS, modales, toasts, icônes
     views/                   une vue par page (+ formulaires, assistant, landing, tour = démo guidée)
     app.js                   routeur par hash, coque, rendu
-tests/unit/                  170 tests ; tests/e2e/run.mjs : 34 tests navigateur
+tests/unit/                  191 tests ; tests/e2e/run.mjs : 44 tests navigateur
 ```
 
 **Règle de dépendance** : `domain` ← `engine` ← `data` ← `views/ui` ← `app`. `domain` n'importe jamais de `views`/`ui`/DOM (vérifié : les tests unitaires l'importent directement sous Node).
@@ -60,6 +61,16 @@ tests/unit/                  170 tests ; tests/e2e/run.mjs : 34 tests navigateur
 | Période | comparée au mois (types mensuels) ou à l'année (types annuels) ; ignorée pour les pièces sans période |
 | Relances | Un dossier est à relancer s'il a au moins une pièce **à corriger ou manquante** (les pièces seulement « en analyse » ne comptent pas). Priorité : échéance dépassée > à corriger > manquantes ; puis plus en retard d'abord. La « dernière relance préparée » est le plus récent événement `message_approved` du dossier : aucune donnée ajoutée, format inchangé |
 | Cohérence des stats | `reçus + manquants = attendus` et `validés + incorrects + en analyse = reçus` (testé) |
+
+## Sauvegarde, restauration, export CSV
+
+- **Enveloppe** : `{app:'readyfile-ai', format:'readyfile-ai-backup', formatVersion:1, exportedAt, data:<état>}`. `data` est exactement l'état stocké (`{version:1, clients, dossiers, events, settings}`) : le format des données n'est pas modifié. `formatVersion` (format du fichier) est distinct de `data.version` (format des données).
+- **Validation avant toute modification** (`domain/backup.js`) : JSON, application, version, types, identifiants uniques, références (dossier→client, événement→client/dossier), statuts cohérents avec l'analyse, tailles et limites (10 Mo). Les clés inconnues sont ignorées. Erreurs : `empty`, `too_large`, `not_json`, `wrong_app`, `newer_version`, `invalid` (avec l'endroit du problème).
+- **Remplacement sûr** (`store.replaceState`) : revalide, écrit puis relit pour vérifier l'écriture ; en cas d'échec l'état et le stockage précédents sont conservés.
+- **Parcours de restauration (interface)** : choix du fichier → validation → fenêtre de confirmation → **étape 1 obligatoire** : télécharger la sauvegarde de l'état actuel (la sauvegarde est relue avant d'être proposée ; si la génération ou le téléchargement échoue, la restauration reste bloquée) → étape 2 : case à cocher → « Remplacer mes données ». Fermer la fenêtre ne change rien.
+- **CSV** : une ligne par dossier + une ligne par client sans dossier ; UTF-8 avec BOM, fins de ligne CRLF, séparateur `;` (FR) ou `,` (EN), dates `AAAA-MM-JJ`, valeurs commençant par `= + - @` neutralisées (injection de formules).
+- **Indépendance** : seule la clé `readyfile-ai-demo` est lue/écrite ; un fichier d'une autre application est refusé.
+- **Limites** : le navigateur ne dit pas si le fichier téléchargé a réellement été enregistré par l'utilisateur ; la sauvegarde contient les données en clair (pas de chiffrement).
 
 ## Brancher un vrai moteur OCR / IA
 

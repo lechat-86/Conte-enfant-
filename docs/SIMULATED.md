@@ -2,7 +2,8 @@
 
 ## ✅ Réellement fonctionnel (en local)
 
-- Navigation, 10 vues, routage, FR/EN à chaud (522 clés par langue, parité testée), préférence mémorisée.
+- Navigation, 10 vues, routage, FR/EN à chaud (578 clés par langue, parité testée), préférence mémorisée.
+- **Sauvegarde / restauration / export** : sauvegarde JSON complète de l'état (enveloppe versionnée), restauration avec validation stricte du fichier, sauvegarde obligatoire de l'état actuel puis confirmation explicite avant remplacement (aucune fusion), export CSV compatible Excel (UTF-8 avec BOM, `;` en FR / `,` en EN, protection contre l'injection de formules). Tout reste local : aucun envoi, aucun service externe.
 - **Relances** : liste des dossiers à relancer (échéance dépassée > documents à corriger > documents manquants), filtres, date de dernière relance *préparée* lue dans l'historique existant (`message_approved`). Elle indique qu'un message a été relu et validé par un humain, **pas qu'il a été envoyé** : rien n'est envoyé.
 - Tableau de bord : tous les chiffres et graphiques sont **calculés** depuis les données (invariants testés).
 - Clients : ajout (validation + échappement), recherche, filtres pays/situation, fiche, historique.
@@ -27,6 +28,6 @@
 | Tarifs et quotas | Hypothèses commerciales, pas des offres vendues |
 | Authentification / comptes / rôles | Inexistants ; le portail s'ouvre avec un jeton visible dans l'URL |
 | Multi-cabinet, isolation, chiffrement, purge, durée de conservation, journal d'accès, RGPD | **Non implémentés** (l'écran Paramètres les liste comme « Non implémenté ») ; la durée de conservation est un champ non appliqué |
-| Persistance | `localStorage` du navigateur (un seul poste, pas de synchronisation) |
+| Persistance | `localStorage` du navigateur (un seul poste, pas de synchronisation). La sauvegarde JSON permet de déplacer les données **à la main** ; ce n'est ni une synchronisation ni une sauvegarde automatique. Le navigateur ne confirme pas que le fichier téléchargé a bien été enregistré : on sait seulement que le téléchargement a été déclenché sans erreur |
 | Délai d'analyse (≈ 1,2 s) | Temporisation artificielle pour montrer l'état « en cours » |
 | Liens du portail | Fonctionnent uniquement dans le navigateur qui détient les données (copier le lien ailleurs ne marche pas) |

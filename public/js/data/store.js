@@ -4,6 +4,7 @@ import { buildSeed, SEED_VERSION } from './seed.js';
 import { createDossier, nextId, slotState } from '../domain/dossier.js';
 import { validateClient, validateDossier, validateSettings } from '../domain/validation.js';
 import { analyzeDocument } from '../engine/index.js';
+import { serializeBackup, validateState } from '../domain/backup.js';
 
 const KEY = 'readyfile-ai-demo';
 
@@ -167,6 +168,32 @@ export function createStore({ storage = safeStorage(), clock = () => new Date(),
       if (!v.ok) return v;
       state.settings = { ...state.settings, ...v.value };
       commit();
+      return { ok: true };
+    },
+
+    /** Sauvegarde complète (JSON) de l'état courant. Ne touche à rien. */
+    exportBackup: () => serializeBackup(state, clock()),
+
+    /**
+     * Remplace TOUT l'état par un état déjà validé (restauration). À n'appeler qu'après confirmation explicite.
+     * Revalide, vérifie que l'écriture a réellement réussi, sinon revient à l'état précédent (rien n'est perdu).
+     */
+    replaceState(next) {
+      const v = validateState(next);
+      if (!v.ok) return { ok: false, error: 'invalid', where: v.where };
+      const previous = state;
+      const json = JSON.stringify(v.state);
+      let stored = false;
+      try {
+        storage.setItem(KEY, json);
+        stored = storage.getItem(KEY) === json;
+      } catch { /* stockage plein ou bloqué */ }
+      if (!stored) {
+        try { storage.setItem(KEY, JSON.stringify(previous)); } catch { /* rien de plus à faire */ }
+        return { ok: false, error: 'storage' };
+      }
+      state = v.state;
+      emit();
       return { ok: true };
     },
 
