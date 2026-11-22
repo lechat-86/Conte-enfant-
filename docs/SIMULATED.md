@@ -2,7 +2,8 @@
 
 ## ✅ Réellement fonctionnel (en local)
 
-- Navigation, 9 vues, routage, FR/EN à chaud (405 clés par langue, parité testée), préférence mémorisée.
+- Navigation, 10 vues, routage, FR/EN à chaud (522 clés par langue, parité testée), préférence mémorisée.
+- **Relances** : liste des dossiers à relancer (échéance dépassée > documents à corriger > documents manquants), filtres, date de dernière relance *préparée* lue dans l'historique existant (`message_approved`). Elle indique qu'un message a été relu et validé par un humain, **pas qu'il a été envoyé** : rien n'est envoyé.
 - Tableau de bord : tous les chiffres et graphiques sont **calculés** depuis les données (invariants testés).
 - Clients : ajout (validation + échappement), recherche, filtres pays/situation, fiche, historique.
 - Dossiers : création depuis 4 modèles, filtres statut/modèle/recherche, statut et complétion **dérivés** des pièces.
@@ -20,7 +21,7 @@
 | Détection de doublon | Empreinte fabriquée ; référence un autre document du dossier, sinon une « archive fictive » (`archive-demo.pdf`) |
 | Dépôt de fichier | Seuls nom et taille lus ; rien n'est transmis ni stocké |
 | Envoi des messages | **Désactivé** : le bouton « Envoyer » est inactif ; aucun email/SMS. « Valider » = trace interne de relecture humaine |
-| Relances automatiques | Non implémentées |
+| Relances automatiques | Non implémentées : la page Relances est une aide à la décision, elle n'envoie ni ne planifie rien |
 | Paiement / abonnement | Aucun : le bouton « Choisir » n'affiche qu'une notification |
 | Prix en dollars | Taux fixe 1,08 (hypothèse), non actualisé |
 | Tarifs et quotas | Hypothèses commerciales, pas des offres vendues |

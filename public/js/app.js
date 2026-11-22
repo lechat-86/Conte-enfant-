@@ -1,5 +1,5 @@
 // Point d'entrée : routeur par hash, coque d'application, rendu, langue.
-import { h, str } from './core/html.js';
+import { h, str, raw } from './core/html.js';
 import { t, getLang, setLang, onLangChange } from './core/i18n.js';
 import { installDelegation, onClick } from './core/actions.js';
 import { setRenderer, setStore, navigate } from './core/bus.js';
@@ -13,6 +13,7 @@ import * as clients from './views/clients.js';
 import * as clientDetail from './views/clientDetail.js';
 import * as dossiers from './views/dossiers.js';
 import * as dossierDetail from './views/dossierDetail.js';
+import * as followups from './views/followups.js';
 import * as lab from './views/lab.js';
 import * as portal from './views/portal.js';
 import * as pricing from './views/pricing.js';
@@ -27,6 +28,7 @@ const routes = [
   { re: /^\/clients\/([\w-]+)$/, keys: ['id'], view: clientDetail, nav: 'clients' },
   { re: /^\/dossiers$/, view: dossiers, nav: 'dossiers' },
   { re: /^\/dossiers\/([\w-]+)$/, keys: ['id'], view: dossierDetail, nav: 'dossiers' },
+  { re: /^\/followups$/, view: followups, nav: 'followups' },
   { re: /^\/analysis$/, view: lab, nav: 'analysis' },
   { re: /^\/pricing$/, view: pricing, nav: 'pricing' },
   { re: /^\/settings$/, view: settings, nav: 'settings' },
@@ -37,6 +39,7 @@ const NAV = [
   ['dashboard', '/', 'dashboard'],
   ['clients', '/clients', 'users'],
   ['dossiers', '/dossiers', 'folder'],
+  ['followups', '/followups', 'mail'],
   ['analysis', '/analysis', 'scan'],
   ['pricing', '/pricing', 'tag'],
   ['settings', '/settings', 'settings'],
@@ -83,7 +86,7 @@ function shell(content, { nav, attention }) {
     <div class="shell ${drawerOpen ? 'drawer-open' : ''}">
       <aside class="sidebar" aria-label="${t('nav.main')}">
         <a class="brand" href="#/">${logoMark(32)}<span><strong>READYFILE</strong><em>AI</em></span></a>
-        <nav>${NAV.map(([key, path, ic]) => h`<a class="nav-link" href="#${path}" ${nav === key ? 'aria-current="page"' : ''}>${icon(ic, 19)}<span>${t(`nav.${key}`)}</span></a>`)}</nav>
+        <nav>${NAV.map(([key, path, ic]) => h`<a class="nav-link" href="#${path}" ${nav === key ? raw('aria-current="page"') : ''}>${icon(ic, 19)}<span>${t(`nav.${key}`)}</span></a>`)}</nav>
         <div class="side-foot">
           <a class="nav-link" href="#/welcome">${icon('globe', 18)}<span>${t('nav.welcome')}</span></a>
           ${sample ? h`<a class="nav-link nav-portal" href="#/portal/${sample.token}">${icon('external', 18)}<span>${t('nav.portal_demo')}</span></a>` : ''}

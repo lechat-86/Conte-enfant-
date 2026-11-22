@@ -19,6 +19,7 @@ public/
       rules.js               règles de décision (lisibilité, type, doublon, période, pages)
       dossier.js             statuts, complétion, interventions, création
       stats.js               statistiques du tableau de bord
+      followups.js           file de relances : priorité, tri, filtres, dernière relance préparée
       messages.js            génération des messages client FR/EN
       validation.js          validation des formulaires (clés d'erreur i18n)
       period.js, pricing.js, countries.js
@@ -29,11 +30,11 @@ public/
       seed.js                jeu de démonstration (100 % fictif)
       store.js               état + persistance localStorage + actions métier
     core/                    html.js (templates échappés), i18n.js, format.js, actions.js, bus.js
-    i18n/                    fr.js, en.js (405 clés chacune, parité testée)
+    i18n/                    fr.js, en.js (522 clés chacune, parité testée)
     ui/                      composants, graphiques SVG/CSS, modales, toasts, icônes
     views/                   une vue par page (+ formulaires, assistant, landing, tour = démo guidée)
     app.js                   routeur par hash, coque, rendu
-tests/unit/                  84 tests ; tests/e2e/run.mjs : 27 tests navigateur
+tests/unit/                  170 tests ; tests/e2e/run.mjs : 34 tests navigateur
 ```
 
 **Règle de dépendance** : `domain` ← `engine` ← `data` ← `views/ui` ← `app`. `domain` n'importe jamais de `views`/`ui`/DOM (vérifié : les tests unitaires l'importent directement sous Node).
@@ -57,6 +58,7 @@ tests/unit/                  84 tests ; tests/e2e/run.mjs : 27 tests navigateur
 | Ordre des anomalies | illisible > mauvais type > doublon > mauvaise période > incomplet |
 | Seuil de lisibilité | 0,6 |
 | Période | comparée au mois (types mensuels) ou à l'année (types annuels) ; ignorée pour les pièces sans période |
+| Relances | Un dossier est à relancer s'il a au moins une pièce **à corriger ou manquante** (les pièces seulement « en analyse » ne comptent pas). Priorité : échéance dépassée > à corriger > manquantes ; puis plus en retard d'abord. La « dernière relance préparée » est le plus récent événement `message_approved` du dossier : aucune donnée ajoutée, format inchangé |
 | Cohérence des stats | `reçus + manquants = attendus` et `validés + incorrects + en analyse = reçus` (testé) |
 
 ## Brancher un vrai moteur OCR / IA

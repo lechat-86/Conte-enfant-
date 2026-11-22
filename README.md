@@ -28,6 +28,7 @@ Le serveur n'écoute que sur `127.0.0.1`. Les données de démonstration sont st
 1. **Tableau de bord** : indicateurs, graphiques, dossiers à traiter, activité (cliquez sur une carte KPI → liste filtrée).
 2. **Dossiers → DOS-007** : 3 anomalies différentes ; simulez un dépôt (scénario au choix) ; cliquez **Préparer un message**.
 3. **Assistant** : message FR/EN, modification libre, copie, case « j'ai relu » obligatoire, aucun envoi.
+   **Relances** (`#/followups`) : tous les dossiers à relancer par priorité (échéance dépassée → documents à corriger → documents manquants), filtres, date de la dernière relance préparée, bouton « Préparer le message » qui ouvre l'assistant. Rien n'est envoyé.
 4. **Analyse documentaire** : les 6 scénarios, contrôles, données extraites (simulées), « Exécuter les scénarios ».
 5. **Portail client** (bouton « Ouvrir le portail client » d'un dossier, ou `#/portal/demo-dos-003`) : déposer un fichier fictif en choisissant le scénario, voir la raison du refus et la progression.
 6. **Offres & tarifs** : 49 / 99 / 199 € (≈ $), calculateur de revenus récurrents vers 10 000 €/mois.
@@ -36,9 +37,9 @@ Le serveur n'écoute que sur `127.0.0.1`. Les données de démonstration sont st
 ## Tests
 
 ```bash
-npm test            # 132 tests unitaires (node:test) — logique métier, i18n, store, données
-npm run test:e2e    # 27 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, mobile, tablette
-npm run test:growth # 20 tests navigateur de l'outil interne GROWTH
+npm test            # 170 tests unitaires (node:test) — logique métier, relances, i18n, store, données
+npm run test:e2e    # 34 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, relances, mobile, tablette
+npm run test:growth # 31 tests navigateur de l'outil interne GROWTH
 npm run test:all
 ```
 

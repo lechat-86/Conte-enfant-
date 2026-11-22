@@ -53,7 +53,7 @@ const waitState = (page, id, state) => page.waitForSelector(`[data-slot="${id}"]
 
 console.log('\nREADYFILE AI — tests end-to-end\n');
 
-const ROUTES = ['/welcome', '/', '/clients', '/clients/CLI-003', '/dossiers', '/dossiers/DOS-007', '/analysis', '/pricing', '/settings', '/portal/demo-dos-003'];
+const ROUTES = ['/welcome', '/', '/clients', '/clients/CLI-003', '/dossiers', '/dossiers/DOS-007', '/followups', '/analysis', '/pricing', '/settings', '/portal/demo-dos-003'];
 
 await test('Toutes les pages se chargent (FR puis EN) sans erreur JS ni clé manquante', async ({ page, go }) => {
   for (const lang of ['fr', 'en']) {
@@ -615,6 +615,122 @@ await test('Mobile : présentation et démo guidée utilisables (sans débordeme
   await page.waitForSelector('.summary-bar, [data-testid="portal-docs"], h1');
   await noOverflow(page, 'tour step 3 @390');
 }, { viewport: { width: 390, height: 844 }, mobile: true });
+
+
+// ---- Page « Relances » -------------------------------------------------------------------------
+const TIER_ORDER = ['overdue', 'to_fix', 'missing'];
+const tiers = (page) => page.locator('[data-testid="followups-table"] tbody tr').evaluateAll((trs) => trs.map((tr) => tr.dataset.tier));
+
+await test('Relances : menu, ordre de priorité (retard > à corriger > manquants), aucun envoi', async ({ page, go }) => {
+  await go('/');
+  await page.click('nav a[href="#/followups"]');
+  await page.waitForSelector('[data-testid="followups-table"]');
+  assert.match(await text(page, 'h1'), /^Relances$/);
+  assert.equal(await page.locator('nav a[aria-current="page"]').innerText(), 'Relances'); // entrée de menu active
+  const t = await tiers(page);
+  assert.ok(t.length >= 4, 'plusieurs relances attendues sur la démo');
+  assert.deepEqual(t.map((x) => TIER_ORDER.indexOf(x)), t.map((x) => TIER_ORDER.indexOf(x)).sort((a, b) => a - b), `ordre incorrect : ${t}`);
+  assert.ok(new Set(t).size >= 2, 'au moins deux niveaux de priorité sur la démo');
+  assert.equal(t[0], 'overdue');
+  assert.match(await text(page, 'main'), /Aucun message n.est envoyé/);
+  assert.equal(await page.locator('main button', { hasText: /^Envoyer/ }).count(), 0, 'aucun bouton d’envoi');
+  // les dossiers complets n'apparaissent pas ; DOS-001 (complet) absent, DOS-008 (3 manquants, en retard) présent
+  assert.equal(await page.locator('tr[data-dossier="DOS-001"]').count(), 0);
+  assert.equal(await page.locator('tr[data-dossier="DOS-008"]').count(), 1);
+  assert.match(await text(page, 'tr[data-dossier="DOS-008"]'), /jour\(s\) de retard|jours? de retard/);
+  assert.match(await text(page, 'tr[data-dossier="DOS-008"] [data-testid="last-prepared"]'), /Jamais/);
+});
+
+await test('Relances : filtres (priorité, recherche, état de préparation) et état « aucun résultat »', async ({ page, go }) => {
+  await go('/followups');
+  const total = await rows(page, 'followups-table');
+  await page.selectOption('select[data-change="followup-tier"]', 'to_fix');
+  assert.ok((await tiers(page)).length > 0 && (await tiers(page)).every((x) => x === 'to_fix'));
+  await page.selectOption('select[data-change="followup-tier"]', 'all');
+  assert.equal(await rows(page, 'followups-table'), total);
+  await page.fill('#followup-q', 'nordic');
+  assert.ok((await rows(page, 'followups-table')) >= 1);
+  assert.ok((await page.locator('[data-testid="followups-table"] tbody tr').allInnerTexts()).every((r) => /Nordic Craft/.test(r)));
+  await page.fill('#followup-q', 'zzz-introuvable');
+  assert.match(await text(page, 'main'), /Aucune relance ne correspond/);
+  await page.fill('#followup-q', '');
+  await page.selectOption('select[data-change="followup-prep"]', 'prepared');
+  assert.match(await text(page, 'main'), /Aucune relance ne correspond/, 'rien n’a encore été préparé');
+  await page.selectOption('select[data-change="followup-prep"]', 'never');
+  assert.equal(await rows(page, 'followups-table'), total);
+});
+
+await test('Relances : « Préparer le message » ouvre l’assistant ; après validation la date de dernière relance apparaît (et persiste)', async ({ page, go }) => {
+  await go('/followups');
+  const before = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('readyfile-ai-demo'))).sort());
+  await page.click('tr[data-dossier="DOS-007"] button[data-action="open-assistant"]');
+  await page.waitForSelector('.modal #msg-text');
+  assert.match(await page.locator('#msg-text').inputValue(), /Jonas Weber/);
+  await page.check('[data-change="msg-reviewed"]');
+  await page.click('[data-action="msg-approve"]');
+  await page.keyboard.press('Escape');
+  const cell = page.locator('tr[data-dossier="DOS-007"] [data-testid="last-prepared"]');
+  await cell.waitFor();
+  assert.ok(!/Jamais/.test(await cell.innerText()), 'la date doit remplacer « Jamais »');
+  assert.match(await cell.innerText(), /\d/);
+  // les autres dossiers ne sont pas touchés
+  assert.match(await text(page, 'tr[data-dossier="DOS-008"] [data-testid="last-prepared"]'), /Jamais/);
+  // filtre « déjà préparées »
+  await page.selectOption('select[data-change="followup-prep"]', 'prepared');
+  assert.equal(await rows(page, 'followups-table'), 1);
+  // persistance + format des données inchangé (mêmes champs de premier niveau)
+  await page.reload();
+  await page.waitForSelector('#main');
+  assert.ok(!/Jamais/.test(await page.locator('tr[data-dossier="DOS-007"] [data-testid="last-prepared"]').innerText()));
+  const after = await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('readyfile-ai-demo'))).sort());
+  assert.deepEqual(after, before);
+});
+
+await test('Relances : bilingue FR/EN à chaud, sans clé manquante', async ({ page, go }) => {
+  await go('/followups');
+  await page.locator('.seg-btn[lang="en"]').first().click();
+  assert.match(await text(page, 'h1'), /^Follow-ups$/);
+  assert.match(await text(page, 'main'), /Nothing is sent/);
+  assert.match(await text(page, 'thead'), /last follow-up prepared/i);
+  assert.match(await text(page, 'tr[data-dossier="DOS-008"]'), /day\(s\) late/);
+  assert.match(await text(page, 'tr[data-dossier="DOS-008"] button'), /Prepare message/);
+  await noMissingKeys(page, 'followups (en)');
+  await page.click('tr[data-dossier="DOS-007"] button[data-action="open-assistant"]');
+  assert.match(await page.locator('#msg-text').inputValue(), /^Hello Jonas Weber,/);
+});
+
+await test('Relances : état vide clair quand tout est complet', async ({ page, go }) => {
+  await go('/');
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('readyfile-ai-demo'));
+    for (const d of s.dossiers) for (const slot of d.slots) {
+      if (!slot.doc || slot.doc.status !== 'valid') slot.doc = { id: `X-${slot.id}`, fileName: 'ok.pdf', sizeKB: 100, receivedAt: new Date().toISOString(), via: 'portal', status: 'valid', attempts: 1 };
+    }
+    localStorage.setItem('readyfile-ai-demo', JSON.stringify(s));
+  });
+  await page.reload();
+  await go('/followups');
+  assert.match(await text(page, 'main'), /Aucune relance nécessaire/);
+  assert.equal(await page.locator('[data-testid="followups-table"]').count(), 0);
+  assert.ok(await page.locator('main a.btn', { hasText: 'Voir les dossiers' }).isVisible());
+  await noMissingKeys(page, 'followups empty');
+});
+
+await test('Relances (mobile 390 px) : lisible, boutons accessibles, sans débordement', async ({ page, go }) => {
+  await go('/followups');
+  await noOverflow(page, 'followups @390');
+  assert.ok(await page.locator('tr[data-dossier="DOS-008"] button[data-action="open-assistant"]').isVisible());
+}, { viewport: { width: 390, height: 844 }, mobile: true });
+
+await test('Menu : aria-current="page" valide (exactement « page », une seule entrée active par page)', async ({ page, go }) => {
+  const NAV_PAGES = { '/': 'Tableau de bord', '/clients': 'Clients', '/dossiers': 'Dossiers', '/followups': 'Relances', '/analysis': 'Analyse documentaire', '/pricing': 'Offres & tarifs', '/settings': 'Paramètres' };
+  for (const [route, label] of Object.entries(NAV_PAGES)) {
+    await go(route);
+    assert.deepEqual(await page.locator('nav .nav-link[aria-current]').evaluateAll((a) => a.map((x) => [x.getAttribute('aria-current'), x.innerText.trim()])), [['page', label]], route);
+  }
+  await go('/dossiers/DOS-007');
+  assert.equal(await page.locator('nav a[aria-current="page"]').innerText(), 'Dossiers', 'une fiche dossier garde « Dossiers » actif');
+});
 
 await test('Tablette (820 px) : pas de débordement sur toutes les pages', async ({ page, go }) => {
   for (const r of ROUTES) { await go(r); await noOverflow(page, `${r} @820`); }
