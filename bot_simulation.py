@@ -18,8 +18,10 @@ RÉALISME (inchangé) : 100 € fictifs, frais 0,40 % par ordre, glissement 0,05
 DEUX MODES
   python bot_simulation.py test     historique coupé en périodes chronologiques ;
                                     sur chaque période, bot vs BTC conservé vs euros
-  python bot_simulation.py suivi    simulation sur les PROCHAINS jours, état sauvegardé
-                                    entre les exécutions (à relancer chaque jour)
+  python bot_simulation.py suivi    simulation EN DIRECT sur les prochains jours : ordres
+                                    fictifs au meilleur prix vendeur (achat) / acheteur (vente)
+                                    public de Coinbase au moment du lancement ; état sauvegardé,
+                                    jamais de doublon, jamais d'ordre à un ancien prix
 
 Ce n'est pas un conseil financier : les performances passées ne disent rien du futur.
 """
@@ -27,6 +29,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -245,22 +248,6 @@ class Suivi:
         # 3) signal de demain, avec les seules clôtures connues
         self.signal = signal_suivant
 
-    def to_dict(self):
-        return {"bot": self.bot.to_dict(), "bh": self.bh.to_dict(), "signal": self.signal,
-                "bh_achete": self.bh_achete, "courbe_bot": self.courbe_bot,
-                "courbe_bh": self.courbe_bh, "premiere_date": self.premiere_date,
-                "derniere_date": self.derniere_date, "premier_open": self.premier_open,
-                "dernier_close": self.dernier_close}
-
-    @classmethod
-    def from_dict(cls, d):
-        s = cls()
-        s.bot, s.bh = Portefeuille.from_dict(d["bot"]), Portefeuille.from_dict(d["bh"])
-        for k in ("signal", "bh_achete", "courbe_bot", "courbe_bh", "premiere_date",
-                  "derniere_date", "premier_open", "dernier_close"):
-            setattr(s, k, d[k])
-        return s
-
 
 def resume(sim):
     c = sim.dernier_close
@@ -312,9 +299,12 @@ def entete(titre):
     print("=" * 70)
 
 
-def parametres():
+def parametres(direct=False):
     print("Stratégie fixe  : moyennes mobiles %d/%d jours, long uniquement" % (RAPIDE, LENTE))
-    print("Exécution       : à l'OUVERTURE du jour suivant le signal")
+    if direct:
+        print("Exécution       : au prix public du moment (achat = meilleur vendeur, vente = meilleur acheteur)")
+    else:
+        print("Exécution       : à l'OUVERTURE du jour suivant le signal")
     print("Frais/glissement: %.2f %% / %.2f %% par ordre ; minimums %.4f BTC et %.0f €"
           % (FRAIS * 100, SLIPPAGE * 100, MIN_BTC, MIN_EUR))
     print("Capital         : %.0f € fictifs (aucune clé API, aucun ordre réel)" % CAPITAL)
@@ -401,67 +391,348 @@ def mode_test(data, nb_periodes, montrer_ordres, csv_ordres):
 
 
 # ----------------------------------------------------------------------------
-# Mode 2 : suivi sur les prochains jours, état sauvegardé
+# Mode 2 : suivi EN DIRECT sur la cotation publique (simulation, état sauvegardé)
 # ----------------------------------------------------------------------------
-def sauver_etat(chemin, etat):
+# Règles :
+#  - le signal 10/30 vient des bougies journalières CLOSES ; il est connu à 00h00 UTC ;
+#  - un ordre fictif n'est créé que si le programme tourne, dans les 24 h après ce
+#    signal, ET qu'une cotation publique fiable est lisible à cet instant ;
+#  - achat au MEILLEUR PRIX VENDEUR, vente au MEILLEUR PRIX ACHETEUR, puis le glissement
+#    et les frais habituels ;
+#  - jamais d'ordre rejoué à un ancien prix : programme arrêté ou cotation indisponible
+#    => aucun ordre ; au prochain lancement, seule la cotation du moment est utilisée ;
+#  - une relance ne duplique jamais un ordre (voir "ANTI-DOUBLON" ci-dessous).
+COINBASE_BOOK = "https://api.exchange.coinbase.com/products/BTC-EUR/book?level=2"
+SPREAD_MAX = 0.01        # écart vendeur/acheteur maximal toléré (1 %)
+DECALAGE_MAX_S = 60      # écart maximal cotation / horloge locale
+VALIDITE_SIGNAL_H = 24   # un signal ne s'exécute que dans les 24 h suivant la clôture
+VERROU_PERIME_S = 600    # un verrou plus vieux est considéré comme laissé par un crash
+VERSION_ETAT = 2
+MAX_EVENEMENTS = 200
+
+
+class CotationIndisponible(Exception):
+    pass
+
+
+def lire_iso(s):
+    """'2026-11-22T18:45:30.460070424Z' -> datetime UTC (tout Python 3.8+)."""
+    m = re.match(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d+))?Z?$", str(s))
+    if not m:
+        raise ValueError("horodatage illisible : %r" % (s,))
+    base = datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    return base.replace(microsecond=int((m.group(2) or "0")[:6].ljust(6, "0")))
+
+
+def iso(dt):
+    dt = dt.astimezone(timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (dt.microsecond // 1000)
+
+
+def court(t):
+    return t[:19].replace("T", " ") + " UTC"
+
+
+def obtenir_cotation():
+    """Meilleurs prix acheteur/vendeur BTC/EUR du carnet public Coinbase, plus la quantité
+    disponible dans la marge de glissement (le glissement simulé suppose qu'un ordre de
+    cette taille se remplit au plus à ce prix limite). Lève CotationIndisponible si la
+    cotation manque ou n'est pas fiable."""
+    try:
+        req = urllib.request.Request(COINBASE_BOOK, headers={"User-Agent": "simulation-bot"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            corps = json.load(r)
+    except Exception as e:
+        raise CotationIndisponible("réseau ou serveur : %s" % e)
+    try:
+        bids = [(float(p), float(q)) for p, q, *_ in corps["bids"]]
+        asks = [(float(p), float(q)) for p, q, *_ in corps["asks"]]
+        bid, ask = max(p for p, _ in bids), min(p for p, _ in asks)
+        heure = lire_iso(corps["time"])
+    except (KeyError, IndexError, ValueError, TypeError) as e:
+        raise CotationIndisponible("réponse incomplète (%s)" % e)
+    if corps.get("auction_mode"):
+        raise CotationIndisponible("carnet en mode enchère")
+    if not 0 < bid < ask:
+        raise CotationIndisponible("cotation incohérente (acheteur %s, vendeur %s)" % (bid, ask))
+    if (ask - bid) / ((ask + bid) / 2) > SPREAD_MAX:
+        raise CotationIndisponible("écart acheteur/vendeur anormal (%.2f %%)"
+                                   % (100 * (ask - bid) / ((ask + bid) / 2)))
+    ecart = abs((datetime.now(timezone.utc) - heure).total_seconds())
+    if ecart > DECALAGE_MAX_S:
+        raise CotationIndisponible("horloge locale décalée ou cotation périmée (%.0f s)" % ecart)
+    return {"bid": bid, "ask": ask,
+            "taille_bid": sum(q for p, q in bids if p >= bid * (1 - SLIPPAGE)),
+            "taille_ask": sum(q for p, q in asks if p <= ask * (1 + SLIPPAGE)),
+            "heure_utc": iso(heure)}
+
+
+def heure_cloture(date_bougie):
+    """Une bougie journalière finit (et son signal est connu) à 00h00 UTC le lendemain."""
+    return datetime.strptime(date_bougie, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+
+
+def debut_serie(data, closes, i):
+    """Heure depuis laquelle le signal en vigueur à la bougie i n'a pas changé."""
+    s, j = signal(closes, i), i
+    while j - 1 >= LENTE - 1 and signal(closes, j - 1) == s:
+        j -= 1
+    return heure_cloture(data[j]["date"])
+
+
+class Verrou:
+    """ANTI-DOUBLON (1/4) : une seule exécution à la fois (deux lancements simultanés
+    ne peuvent pas créer deux fois le même ordre)."""
+
+    def __init__(self, chemin_etat):
+        self.chemin = chemin_etat + ".lock"
+
+    def __enter__(self):
+        for _ in range(2):
+            try:
+                fd = os.open(self.chemin, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                return self
+            except FileExistsError:
+                try:
+                    perime = time.time() - os.path.getmtime(self.chemin) > VERROU_PERIME_S
+                    if perime:
+                        os.remove(self.chemin)
+                        continue
+                except OSError:
+                    continue
+                sys.exit("Une autre exécution du suivi est en cours (verrou %s). "
+                         "Rien n'a été modifié." % self.chemin)
+        sys.exit("Impossible de poser le verrou %s." % self.chemin)
+
+    def __exit__(self, *exc):
+        try:
+            os.remove(self.chemin)
+        except OSError:
+            pass
+
+
+def lire_etat(chemin):
+    if not os.path.exists(chemin):
+        return None
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            etat = json.load(f)
+        version = etat["version"]
+    except (ValueError, KeyError, TypeError) as e:
+        sys.exit("Fichier d'état illisible (%s). Rien n'a été modifié ; sauvegardez-le puis "
+                 "relancez avec --reset pour repartir de zéro." % e)
+    if version != VERSION_ETAT:
+        sys.exit("Fichier d'état d'un ancien format (version %s). Rien n'a été modifié ; "
+                 "utilisez --reset ou --etat avec un autre nom de fichier." % version)
+    return etat
+
+
+def ecrire_etat(chemin, etat, revision_lue):
+    """ANTI-DOUBLON (2/4) : écriture atomique (ordre + marque 'signal traité' dans le même
+    fichier, remplacé d'un bloc) avec contrôle de révision : si un autre processus a écrit
+    entre-temps, on n'écrit rien."""
+    if revision_lue is not None and os.path.exists(chemin):
+        try:
+            with open(chemin, encoding="utf-8") as f:
+                actuelle = json.load(f).get("revision", 0)
+        except ValueError:
+            actuelle = -1
+        if actuelle != revision_lue:
+            sys.exit("L'état a été modifié par une autre exécution : rien n'a été écrit. Relancez.")
+    etat["revision"] = (revision_lue or 0) + 1
     tmp = chemin + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(etat, f, ensure_ascii=False, indent=1)
     os.replace(tmp, chemin)
 
 
-def mode_suivi(data, chemin_etat, reset=False):
-    closes = [d["close"] for d in data]
-    etat = None
-    if os.path.exists(chemin_etat) and not reset:
-        try:
-            with open(chemin_etat, encoding="utf-8") as f:
-                etat = json.load(f)
-            sim = Suivi.from_dict(etat["sim"])
-        except (ValueError, KeyError) as e:
-            sys.exit("Fichier d'état illisible (%s). Relancez avec --reset pour repartir "
-                     "de zéro (cela efface l'historique du suivi)." % e)
-    nouveaux = 0
-    if etat is None:
-        i = len(data) - 1
-        sim = Suivi()
-        sim.signal = signal(closes, i)
-        etat = {"version": 1, "debut": data[i]["date"], "derniere_date": data[i]["date"]}
-        sauver_etat(chemin_etat, dict(etat, sim=sim.to_dict()))
-        entete("SUIVI EN SIMULATION - NOUVEAU DÉPART")
-        print("Départ à la clôture du %s avec %.0f € fictifs." % (data[i]["date"], CAPITAL))
-        print("Signal calculé à cette clôture : %s -> premier ordre possible à l'OUVERTURE du jour suivant."
-              % ("position BTC" if sim.signal == "long" else "rester en euros"))
-        print("Rien n'est exécuté avec des prix postérieurs au départ : relancez la commande")
-        print("chaque jour (la bougie du jour est close à 00h00 UTC, soit 01h/02h à Paris).")
+def verifier_profondeur(sens, p, cot):
+    """La quantité disponible entre le meilleur prix et le prix limite (meilleur prix +/-
+    glissement) doit couvrir l'ordre, sinon pas d'ordre."""
+    if sens == "ACHAT":
+        qty = p.cash / (cot["ask"] * (1 + SLIPPAGE) * (1 + FRAIS))
+        dispo = cot["taille_ask"]
     else:
-        for i, d in enumerate(data):
-            if d["date"] > etat["derniere_date"]:
-                sim.jour(d["date"], d["open"], d["close"], signal(closes, i))
-                etat["derniere_date"] = d["date"]
-                nouveaux += 1
-        if nouveaux:
-            sauver_etat(chemin_etat, dict(etat, sim=sim.to_dict()))
-        entete("SUIVI EN SIMULATION - PROCHAINS JOURS")
-        print("Départ : clôture du %s   |   Dernier jour traité : %s   |   Nouveaux jours : %d"
-              % (etat["debut"], etat["derniere_date"], nouveaux))
-        if not nouveaux:
-            print("Aucun nouveau jour clos depuis la dernière exécution : rien à simuler.")
-    parametres()
-    if sim.premiere_date is None:
-        print("\nAucun jour simulé pour l'instant : relancez après la prochaine clôture.")
-        return
-    print("\nPériode simulée : %s -> %s (%d jours)   BTC : %.0f € -> %.0f € (%+.1f %%)"
-          % (sim.premiere_date, sim.derniere_date, len(sim.courbe_bot) - 1, sim.premier_open,
-             sim.dernier_close, (sim.dernier_close / sim.premier_open - 1) * 100))
-    print("Position actuelle du bot : %.2f € en euros + %.8f BTC ; signal en attente : %s"
-          % (sim.bot.cash, sim.bot.btc,
-             "position BTC" if sim.signal == "long" else "euros"))
-    afficher_bloc(sim)
-    print("\nHistorique des ordres du bot :")
-    afficher_ordres(sim.bot.ordres)
-    print("\nÉtat enregistré dans : %s (supprimez-le ou utilisez --reset pour recommencer)"
-          % chemin_etat)
+        qty, dispo = p.btc, cot["taille_bid"]
+    if qty > dispo:
+        raise CotationIndisponible("liquidité insuffisante dans la marge de glissement "
+                                   "(%.6f BTC pour %.6f voulus)" % (dispo, qty))
+
+
+def passer_ordre(p, sens, cot, ordre_id, meta):
+    """Ordre FICTIF au prix public du moment : meilleur vendeur (achat) ou meilleur
+    acheteur (vente), puis glissement et frais de Portefeuille.
+    ANTI-DOUBLON (3/4) : un identifiant d'ordre déjà enregistré n'est jamais rejoué."""
+    if any(o.get("ordre_id") == ordre_id for o in p.ordres):
+        return None
+    if sens == "ACHAT":
+        prix_cotation = cot["ask"]
+        p.acheter(cot["heure_utc"], prix_cotation)
+    else:
+        prix_cotation = cot["bid"]
+        p.vendre(cot["heure_utc"], prix_cotation)
+    o = p.ordres[-1]
+    o.update(meta, ordre_id=ordre_id, heure_execution_utc=cot["heure_utc"],
+             prix_cotation=prix_cotation, cotation_bid=cot["bid"], cotation_ask=cot["ask"])
+    return o
+
+
+def _evenement(etat, t, type_, detail):
+    etat["evenements"].append({"t": t, "type": type_, "detail": detail})
+    del etat["evenements"][:-MAX_EVENEMENTS]
+
+
+def mode_suivi(data, chemin_etat, reset=False, cotation_fn=obtenir_cotation, maintenant_fn=None):
+    maintenant_fn = maintenant_fn or (lambda: datetime.now(timezone.utc))
+    closes = [d["close"] for d in data]
+    with Verrou(chemin_etat):
+        maintenant = maintenant_fn()
+        etat = None if reset else lire_etat(chemin_etat)
+        revision_lue = None if reset else (etat.get("revision", 0) if etat else 0)
+
+        i = len(data) - 1
+        d_signal, t_signal = data[i]["date"], heure_cloture(data[i]["date"])
+        age_h = (maintenant - t_signal).total_seconds() / 3600
+        signal_valide = 0 <= age_h <= VALIDITE_SIGNAL_H
+        cible = signal(closes, i)
+        depuis = iso(debut_serie(data, closes, i))
+        meta = {"signal": cible, "bougie_signal": d_signal, "heure_signal_utc": iso(t_signal),
+                "signal_depuis_utc": depuis}
+        try:
+            cot, cot_err = cotation_fn(), None
+        except CotationIndisponible as e:
+            cot, cot_err = None, str(e)
+        notes = []
+
+        if etat is None:
+            # ---- DÉMARRAGE : un seul départ, bot et BTC conservé sur la même cotation
+            if not signal_valide:
+                sys.exit("Les bougies journalières ne sont pas à jour (dernière : %s). "
+                         "Aucun démarrage, aucun ordre. Réessayez dans quelques minutes." % d_signal)
+            if cot is None:
+                sys.exit("Cotation publique indisponible (%s). Aucun démarrage, aucun ordre créé."
+                         % cot_err)
+            bot, bh = Portefeuille(), Portefeuille()
+            try:
+                verifier_profondeur("ACHAT", bh, cot)
+            except CotationIndisponible as e:
+                sys.exit("Cotation inutilisable (%s). Aucun démarrage, aucun ordre créé." % e)
+            passer_ordre(bh, "ACHAT", cot, "BH-DEMARRAGE-ACHAT",
+                         {"reference": "BTC conservé", "heure_signal_utc": None})
+            if cible == "long":
+                passer_ordre(bot, "ACHAT", cot, "BOT-%s-ACHAT" % d_signal, meta)
+            etat = {"version": VERSION_ETAT, "demarrage_utc": cot["heure_utc"],
+                    "dernier_signal_traite": d_signal, "bot": bot.to_dict(), "bh": bh.to_dict(),
+                    "releves": [], "evenements": []}
+            notes.append("NOUVEAU DÉPART : 100 € fictifs, BTC conservé acheté au même instant.")
+            notes.append("Signal en vigueur : %s -> %s." % (
+                "position BTC" if cible == "long" else "rester en euros",
+                "achat simulé au meilleur prix vendeur" if cible == "long" else "aucun ordre"))
+        else:
+            bot, bh = Portefeuille.from_dict(etat["bot"]), Portefeuille.from_dict(etat["bh"])
+            if d_signal <= etat["dernier_signal_traite"]:
+                # ANTI-DOUBLON (4/4) : ce signal a déjà été traité -> aucune action
+                notes.append("Signal du %s déjà traité : aucun nouvel ordre." % d_signal)
+            elif not signal_valide:
+                _evenement(etat, iso(maintenant), "DONNEES_PERIMEES",
+                           "dernière bougie %s ; aucun ordre" % d_signal)
+                notes.append("Bougies journalières non à jour : aucun ordre.")
+            elif cot is None:
+                _evenement(etat, iso(maintenant), "COTATION_INDISPONIBLE", cot_err)
+                notes.append("Cotation indisponible (%s) : AUCUN ordre créé ; nouvelle tentative "
+                             "au prochain lancement tant que le signal est valide (24 h)." % cot_err)
+            else:
+                sens = ("ACHAT" if cible == "long" and bot.btc == 0
+                        else "VENTE" if cible == "cash" and bot.btc > 0 else None)
+                try:
+                    if sens:
+                        verifier_profondeur(sens, bot, cot)
+                except CotationIndisponible as e:
+                    cot_err = str(e)
+                    _evenement(etat, iso(maintenant), "COTATION_INSUFFISANTE", cot_err)
+                    notes.append("Cotation inutilisable (%s) : AUCUN ordre créé." % cot_err)
+                else:
+                    if sens:
+                        passer_ordre(bot, sens, cot, "BOT-%s-%s" % (d_signal, sens), meta)
+                        notes.append("Signal du %s : ordre %s simulé (%.0f min après la clôture)."
+                                     % (d_signal, sens, age_h * 60))
+                    else:
+                        notes.append("Signal du %s : position déjà conforme, aucun ordre." % d_signal)
+                    etat["dernier_signal_traite"] = d_signal
+            etat["bot"], etat["bh"] = bot.to_dict(), bh.to_dict()
+
+        if cot is not None:
+            etat["releves"].append({"t": cot["heure_utc"], "bid": cot["bid"], "ask": cot["ask"],
+                                    "bot": bot.valeur(cot["bid"]), "bh": bh.valeur(cot["bid"])})
+        ecrire_etat(chemin_etat, etat, revision_lue)
+    afficher_suivi(etat, cot, cot_err, notes, maintenant, chemin_etat, d_signal, cible, depuis)
+    return etat
+
+
+def afficher_ordre_live(n, o):
+    print("  #%d %-5s %-8s [%s]" % (n, o["sens"], o["statut"], o["ordre_id"]))
+    if o.get("heure_signal_utc"):
+        retard = (lire_iso(o["heure_execution_utc"]) - lire_iso(o["heure_signal_utc"])).total_seconds()
+        print("      signal      : %s (bougie du %s, en vigueur depuis %s)"
+              % (court(o["heure_signal_utc"]), o["bougie_signal"], court(o["signal_depuis_utc"])))
+        print("      exécution   : %s (%.0f min après le signal)"
+              % (court(o["heure_execution_utc"]), retard / 60))
+    else:
+        print("      exécution   : %s (démarrage, référence BTC conservé)" % court(o["heure_execution_utc"]))
+    cote = "meilleur vendeur" if o["sens"] == "ACHAT" else "meilleur acheteur"
+    print("      prix utilisé: %s %.2f € (acheteur %.2f / vendeur %.2f) -> prix appliqué %.2f € "
+          "avec glissement" % (cote, o["prix_cotation"], o["cotation_bid"], o["cotation_ask"], o["prix"]))
+    if o["statut"] == "EXÉCUTÉ":
+        print("      quantité    : %.8f BTC, montant %.2f €, frais %.2f €"
+              % (o["quantite_btc"], o["montant_eur"], o["frais_eur"]))
+    else:
+        print("      refusé      : %s" % o["raison"])
+
+
+def afficher_suivi(etat, cot, cot_err, notes, maintenant, chemin, d_signal, cible, depuis):
+    bot, bh = Portefeuille.from_dict(etat["bot"]), Portefeuille.from_dict(etat["bh"])
+    entete("SUIVI EN SIMULATION - COTATION PUBLIQUE COINBASE (aucun ordre réel)")
+    print("Démarrage       : %s   (%.0f € fictifs)" % (court(etat["demarrage_utc"]), CAPITAL))
+    print("Cette exécution : %s" % court(iso(maintenant)))
+    if cot:
+        print("Cotation        : meilleur acheteur %.2f € | meilleur vendeur %.2f € (à %s)"
+              % (cot["bid"], cot["ask"], court(cot["heure_utc"])))
+    else:
+        print("Cotation        : INDISPONIBLE (%s)" % cot_err)
+    print("Signal en vigueur: %s (bougie du %s, depuis %s)"
+          % ("position BTC" if cible == "long" else "euros", d_signal, court(depuis)))
+    parametres(direct=True)
+    print()
+    for n in notes:
+        print(">> " + n)
+    releves = etat["releves"]
+    if releves:
+        ref = cot["bid"] if cot else releves[-1]["bid"]
+        sim = Suivi()
+        sim.bot, sim.bh = bot, bh
+        sim.courbe_bot = [CAPITAL] + [r["bot"] for r in releves]
+        sim.courbe_bh = [CAPITAL] + [r["bh"] for r in releves]
+        sim.dernier_close = ref
+        print("\nDEPUIS LE MÊME DÉMARRAGE (valorisé au meilleur prix acheteur de %.2f €, après frais"
+              % ref)
+        print("et glissement d'une vente ; baisse mesurée sur %d relevé(s)) :" % len(releves))
+        afficher_bloc(sim)
+    print("\nORDRES DU BOT (%d)" % len(bot.ordres))
+    if not bot.ordres:
+        print("  (aucun ordre : le bot est en euros)")
+    for n, o in enumerate(bot.ordres, 1):
+        afficher_ordre_live(n, o)
+    print("\nACHAT DU BTC CONSERVÉ (référence)")
+    for n, o in enumerate(bh.ordres, 1):
+        afficher_ordre_live(n, o)
+    if etat["evenements"]:
+        print("\nÉVÉNEMENTS (aucun ordre créé dans ces cas) - les 5 derniers :")
+        for e in etat["evenements"][-5:]:
+            print("  %s  %-22s %s" % (court(e["t"]), e["type"], e["detail"]))
+    print("\nÉtat enregistré dans : %s. Relancez-le au moins une fois par jour après 00h00 UTC" % chemin)
+    print("(01h/02h à Paris) ; un signal non exécuté dans les 24 h suivant la clôture est abandonné.")
 
 
 # ----------------------------------------------------------------------------
@@ -470,16 +741,16 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     commun = argparse.ArgumentParser(add_help=False)
     commun.add_argument("--cache", default="donnees_btc_eur.csv", help="cache des prix")
-    commun.add_argument("--hors-ligne", action="store_true",
-                        help="n'utilise que le cache local, sans réseau")
     a = argparse.ArgumentParser(description="Bot de trading en simulation (100 € fictifs).")
     sub = a.add_subparsers(dest="cmd")
     t = sub.add_parser("test", parents=[commun], help="test sur périodes chronologiques")
+    t.add_argument("--hors-ligne", action="store_true",
+                   help="n'utilise que le cache local, sans réseau")
     t.add_argument("--periodes", type=int, default=3)
     t.add_argument("--ordres", action="store_true", help="liste tous les ordres de chaque période")
     t.add_argument("--csv", default="historique_ordres.csv")
     s = sub.add_parser("suivi", parents=[commun], help="simulation sur les prochains jours")
-    s.add_argument("--etat", default="etat_simulation.json")
+    s.add_argument("--etat", default="etat_suivi_live.json")
     s.add_argument("--reset", action="store_true", help="efface l'état et repart de zéro")
     args = a.parse_args()
     if args.cmd is None:
@@ -487,7 +758,7 @@ def main():
 
     if args.cmd == "test" and not 2 <= args.periodes <= 10:
         sys.exit("--periodes doit être entre 2 et 10")
-    data = charger_donnees(args.cache, args.hors_ligne)
+    data = charger_donnees(args.cache, getattr(args, "hors_ligne", False))
     if args.cmd == "suivi":
         mode_suivi(data, args.etat, args.reset)
     else:

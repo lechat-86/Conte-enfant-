@@ -3,3 +3,5 @@ donnees_btc_eur.csv
 etat_simulation.json
 *.tmp
 __pycache__/
+etat_suivi_live.json
+etat_suivi_live.json.lock
