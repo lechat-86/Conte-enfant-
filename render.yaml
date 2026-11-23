@@ -1,0 +1,25 @@
+# Déploiement Render (https://render.com) : "New +" > "Blueprint" > choisir ce dépôt.
+services:
+  - type: web
+    name: shai-and-glow
+    runtime: docker
+    plan: starter          # un disque persistant exige une offre payante
+    disk:
+      name: boutique-data
+      mountPath: /data     # base de données + photos : ne jamais perdre ce disque
+      sizeGB: 1
+    envVars:
+      - key: SITE_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

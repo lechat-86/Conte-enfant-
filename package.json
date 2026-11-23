@@ -1,0 +1,13 @@
+{
+  "name": "shai-and-glow",
+  "version": "1.0.0",
+  "description": "Boutique en ligne SHAÏ & GLOW (beauté, parfums, soins)",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning test/smoke.mjs"
+  }
+}
