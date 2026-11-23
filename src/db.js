@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS products (
   short_desc TEXT DEFAULT '', description TEXT DEFAULT '',
   price_cents INTEGER NOT NULL, compare_cents INTEGER, cost_cents INTEGER NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0, low_stock INTEGER NOT NULL DEFAULT 3,
-  images TEXT NOT NULL DEFAULT '[]', active INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0,
+  images TEXT NOT NULL DEFAULT '[]', featured INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS stock_moves (
@@ -70,6 +70,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_products_cat ON products(category_id);
 `);
+
+// Migration : bases créées avant l'ajout des « coups de cœur »
+if (!db.prepare('PRAGMA table_info(products)').all().some((c) => c.name === 'featured')) {
+  db.exec('ALTER TABLE products ADD COLUMN featured INTEGER NOT NULL DEFAULT 0');
+}
 
 export function tx(fn) {
   db.exec('BEGIN IMMEDIATE');
@@ -132,8 +137,8 @@ function seed() {
   if (!db.prepare('SELECT 1 FROM products LIMIT 1').get()) {
     const cat = db.prepare('SELECT id FROM categories WHERE slug=?').get('brumes-parfums');
     tx(() => {
-      const r = db.prepare(`INSERT INTO products(slug,name,brand,size,category_id,short_desc,description,price_cents,cost_cents,stock,low_stock,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      const r = db.prepare(`INSERT INTO products(slug,name,brand,size,category_id,short_desc,description,price_cents,cost_cents,stock,low_stock,featured,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?)`).run(
         'brume-corps-et-cheveux-prady-monoi-tiare-250-ml',
         'Brume corps et cheveux Monoï Tiaré',
         'Prady', '250 ml', cat.id,

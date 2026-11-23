@@ -56,8 +56,8 @@ p{margin:0 0 1em}
 @media(min-width:900px){
   .menu-btn{display:none}.header-in{grid-template-areas:". brand actions" "nav nav nav"}
   .wm{font-size:2.1rem;letter-spacing:.2em;gap:.35em}.logo-img{height:56px}
-  .nav{display:flex;flex-direction:row;justify-content:center;gap:2.2rem;border:0;margin:0;padding:.2rem 0 .5rem}
-  .nav a{border:0;padding:.3rem 0;font-size:.82rem;text-transform:uppercase;letter-spacing:.14em;position:relative}
+  .nav{display:flex;flex-direction:row;justify-content:center;gap:.85rem;border:0;margin:0;padding:.2rem 0 .5rem;flex-wrap:wrap}
+  .nav a{border:0;padding:.3rem 0;font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;position:relative;white-space:nowrap}
   .nav a::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--rg);transform:scaleX(0);transition:.25s}.nav a:hover::after{transform:scaleX(1)}
 }
 
@@ -191,3 +191,5 @@ code{background:var(--blush);padding:.1rem .4rem;border-radius:6px;font-size:.88
 .slip-addr{border:2px solid var(--ink);padding:1rem 1.4rem;border-radius:6px;margin-bottom:1.5rem;font-size:1.3rem;line-height:1.5}.slip-addr small{display:block;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}.slip-addr p{margin:.3rem 0 0}
 @media print{.noprint{display:none}.slip-page{margin:0}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+@media(min-width:1100px){.nav{gap:2rem}.nav a{font-size:.82rem;letter-spacing:.14em}}

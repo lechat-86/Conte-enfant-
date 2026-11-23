@@ -40,9 +40,10 @@ const ok = (n) => console.log('  ✓', n);
 let failed = false;
 try {
   const c = new Client();
-  for (const u of ['/', '/boutique', '/categorie/brumes-parfums', '/categorie/maquillage', '/recherche?q=prady', '/panier', '/contact', '/cgv', '/mentions-legales', '/livraison', '/retours', '/faq', '/confidentialite', '/a-propos', '/sitemap.xml', '/robots.txt', '/compte/connexion', '/css/style.css', '/favicon.svg'])
+  for (const u of ['/', '/boutique', '/coups-de-coeur', '/categorie/brumes-parfums', '/categorie/maquillage', '/recherche?q=prady', '/panier', '/contact', '/cgv', '/mentions-legales', '/livraison', '/retours', '/faq', '/confidentialite', '/a-propos', '/sitemap.xml', '/robots.txt', '/compte/connexion', '/css/style.css', '/favicon.svg'])
     assert.equal((await c.req('GET', u)).status, 200, u);
   ok('pages publiques (200)');
+  assert.match((await c.req('GET', '/')).text, /Nos coups de cœur/); assert.match((await c.req('GET', '/coups-de-coeur')).text, /Monoï Tiaré/); assert.doesNotMatch((await c.req('GET', '/')).text, /Nouveaut|Créations/); ok('rubrique Nos coups de cœur (sans Nouveautés ni Créations)');
   assert.equal((await c.req('GET', '/page-inconnue')).status, 404); ok('404');
   assert.equal((await c.req('GET', '/admin')).status, 303); ok('admin protégé');
   assert.equal((await c.req('GET', '/uploads/../shop.db')).status, 404); assert.equal((await c.req('GET', '/..%2fsrc/db.js')).status, 404); ok('pas de traversée de dossier');

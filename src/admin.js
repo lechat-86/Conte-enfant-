@@ -88,7 +88,7 @@ A('/admin/produits', (ctx) => {
   const ps = db.prepare('SELECT p.*, c.name cat FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.deleted=0 ORDER BY p.created_at DESC').all();
   adminPage(ctx, '/admin/produits', 'Produits', html`<p><a class="btn" href="/admin/produits/nouveau">+ Ajouter un produit</a></p>
   ${ps.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Produit</th><th>Catégorie</th><th class="r">Prix</th><th class="r">Achat</th><th class="r">Marge</th><th class="r">Stock</th><th>État</th></tr></thead><tbody>
-  ${ps.map((p) => html`<tr><td class="thumb-cell">${productImage(p)}</td><td><a class="link" href="/admin/produits/${p.id}"><b>${p.name}</b></a><br><small class="muted">${p.brand} ${p.size}</small></td><td>${p.cat || '—'}</td><td class="r">${eur(p.price_cents)}</td><td class="r">${eur(p.cost_cents)}</td><td class="r">${eur(p.price_cents - p.cost_cents)}</td>
+  ${ps.map((p) => html`<tr><td class="thumb-cell">${productImage(p)}</td><td><a class="link" href="/admin/produits/${p.id}"><b>${p.name}</b></a>${p.featured ? ' ♥' : ''}<br><small class="muted">${p.brand} ${p.size}</small></td><td>${p.cat || '—'}</td><td class="r">${eur(p.price_cents)}</td><td class="r">${eur(p.cost_cents)}</td><td class="r">${eur(p.price_cents - p.cost_cents)}</td>
    <td class="r">${p.stock <= 0 ? html`<b class="danger">0</b>` : p.stock <= p.low_stock ? html`<b class="warn">${p.stock}</b>` : p.stock}</td><td>${p.active ? html`<span class="pill st-paid">En ligne</span>` : html`<span class="pill st-pending">Masqué</span>`}</td></tr>`)}</tbody></table></div>`
     : html`<div class="empty"><p>Aucun produit.</p></div>`}`);
 });
@@ -113,7 +113,8 @@ function productForm(ctx, p = {}) {
     <div class="row3">${inp('Prix de vente TTC (€) *', 'price', p.price_cents != null ? fromCents(p.price_cents) : '', 'required inputmode="decimal"')}${inp('Ancien prix barré (€)', 'compare', p.compare_cents ? fromCents(p.compare_cents) : '', 'inputmode="decimal"', 'facultatif')}${inp('Prix d’achat HT (€)', 'cost', p.cost_cents != null ? fromCents(p.cost_cents) : '', 'inputmode="decimal"', 'jamais visible des clientes')}</div>
     <div class="row3">${inp('Stock disponible', 'stock', p.stock ?? 0, 'inputmode="numeric"')}${inp('Alerte stock bas à', 'low_stock', p.low_stock ?? 3, 'inputmode="numeric"')}${inp('Référence fournisseur', 'sku', p.sku, 'maxlength="60"')}</div>
     ${inp('Fournisseur', 'supplier', p.supplier, 'maxlength="100"')}
-    <label class="check"><input type="checkbox" name="active" value="1" ${p.active === 0 ? '' : 'checked'}> <span>Produit visible dans la boutique</span></label></div>
+    <label class="check"><input type="checkbox" name="active" value="1" ${p.active === 0 ? '' : 'checked'}> <span>Produit visible dans la boutique</span></label>
+    <label class="check"><input type="checkbox" name="featured" value="1" ${p.featured ? 'checked' : ''}> <span>♥ Afficher dans « Nos coups de cœur »</span></label></div>
   <p class="actions"><button class="btn btn-lg">${isNew ? 'Créer le produit' : 'Enregistrer'}</button> <a class="btn btn-ghost" href="/admin/produits">Annuler</a></p></form>
   ${!isNew ? html`<form method="post" action="/admin/produits/${p.id}/supprimer" class="mt" ${confirmAttr('Supprimer définitivement ce produit de la boutique ? (l’historique des commandes est conservé)')}>${csrfIn(ctx)}<button class="btn btn-danger btn-sm">Supprimer ce produit</button></form>` : ''}`;
 }
@@ -132,19 +133,19 @@ A('/admin/produits/enregistrer', (ctx) => {
   const row = {
     name, brand: f('brand', 80), size: f('size', 40), sku: f('sku', 60), supplier: f('supplier', 100), short_desc: f('short_desc', 300), description: ctx.form('description').slice(0, 5000),
     category_id: clampInt(ctx.body.category_id, 1, 1e9, 0) || null, price_cents: price, compare_cents: compare > price ? compare : null, cost_cents: toCents(ctx.body.cost),
-    low_stock: clampInt(ctx.body.low_stock, 0, 1000, 3), images: JSON.stringify(safeImgs(ctx.body.images || '[]')), active: ctx.body.active === '1' ? 1 : 0,
+    featured: ctx.body.featured === '1' ? 1 : 0, low_stock: clampInt(ctx.body.low_stock, 0, 1000, 3), images: JSON.stringify(safeImgs(ctx.body.images || '[]')), active: ctx.body.active === '1' ? 1 : 0,
   };
   const now = Date.now();
   let pid = id;
   tx(() => {
     if (id) {
       const old = db.prepare('SELECT * FROM products WHERE id=? AND deleted=0').get(id); if (!old) throw new Error('introuvable');
-      db.prepare(`UPDATE products SET name=?,brand=?,size=?,sku=?,supplier=?,short_desc=?,description=?,category_id=?,price_cents=?,compare_cents=?,cost_cents=?,low_stock=?,images=?,active=?,updated_at=? WHERE id=?`)
-        .run(row.name, row.brand, row.size, row.sku, row.supplier, row.short_desc, row.description, row.category_id, row.price_cents, row.compare_cents, row.cost_cents, row.low_stock, row.images, row.active, now, id);
+      db.prepare(`UPDATE products SET name=?,brand=?,size=?,sku=?,supplier=?,short_desc=?,description=?,category_id=?,price_cents=?,compare_cents=?,cost_cents=?,low_stock=?,images=?,active=?,featured=?,updated_at=? WHERE id=?`)
+        .run(row.name, row.brand, row.size, row.sku, row.supplier, row.short_desc, row.description, row.category_id, row.price_cents, row.compare_cents, row.cost_cents, row.low_stock, row.images, row.active, row.featured, now, id);
       if (stock !== old.stock) adjustStock(id, stock - old.stock, 'Correction manuelle (fiche produit)');
     } else {
-      const r = db.prepare(`INSERT INTO products(slug,name,brand,size,sku,supplier,short_desc,description,category_id,price_cents,compare_cents,cost_cents,stock,low_stock,images,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)`)
-        .run(uniqueSlug(name), row.name, row.brand, row.size, row.sku, row.supplier, row.short_desc, row.description, row.category_id, row.price_cents, row.compare_cents, row.cost_cents, row.low_stock, row.images, row.active, now, now);
+      const r = db.prepare(`INSERT INTO products(slug,name,brand,size,sku,supplier,short_desc,description,category_id,price_cents,compare_cents,cost_cents,stock,low_stock,images,active,featured,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?)`)
+        .run(uniqueSlug(name), row.name, row.brand, row.size, row.sku, row.supplier, row.short_desc, row.description, row.category_id, row.price_cents, row.compare_cents, row.cost_cents, row.low_stock, row.images, row.active, row.featured, now, now);
       pid = Number(r.lastInsertRowid);
       if (stock) adjustStock(pid, stock, 'Stock initial');
     }

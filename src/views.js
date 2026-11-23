@@ -66,7 +66,7 @@ export function layout(ctx, { title, description = '', body, noindex = false, im
   const fullTitle = title ? `${title} — ${s.shop_name}` : `${s.shop_name} — Beauté, parfums & soins`;
   const desc = description || 'Boutique en ligne de beauté : brumes et parfums, maquillage, soins visage et corps.';
   const n = cartCount(ctx);
-  const nav = html`<a href="/boutique">Boutique</a>${cats.map((c) => html`<a href="/categorie/${c.slug}">${c.name}</a>`)}<a href="/a-propos">Notre univers</a><a href="/contact">Contact</a>`;
+  const nav = html`<a href="/boutique">Boutique</a>${cats.map((c) => html`<a href="/categorie/${c.slug}">${c.name}</a>`)}<a href="/coups-de-coeur">Nos coups de cœur</a><a href="/a-propos">Notre univers</a><a href="/contact">Contact</a>`;
   return html`<!doctype html>
 <html lang="fr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -103,7 +103,7 @@ ${body}
       <p>Brumes &amp; parfums, maquillage, soins visage et corps.</p>
       ${s.instagram || s.tiktok ? html`<p class="social">${s.instagram ? html`<a href="${s.instagram}" rel="noopener" target="_blank">Instagram</a>` : ''}${s.tiktok ? html`<a href="${s.tiktok}" rel="noopener" target="_blank">TikTok</a>` : ''}</p>` : ''}
     </div>
-    <div><h4>Boutique</h4><ul>${cats.map((c) => html`<li><a href="/categorie/${c.slug}">${c.name}</a></li>`)}</ul></div>
+    <div><h4>Boutique</h4><ul>${cats.map((c) => html`<li><a href="/categorie/${c.slug}">${c.name}</a></li>`)}<li><a href="/coups-de-coeur">Nos coups de cœur</a></li></ul></div>
     <div><h4>Aide</h4><ul><li><a href="/livraison">Livraison</a></li><li><a href="/retours">Retours &amp; remboursements</a></li><li><a href="/faq">Questions fréquentes</a></li><li><a href="/contact">Nous contacter</a></li><li><a href="/compte">Mon compte</a></li></ul></div>
     <div><h4>Informations</h4><ul><li><a href="/a-propos">Notre univers</a></li><li><a href="/cgv">Conditions générales de vente</a></li><li><a href="/mentions-legales">Mentions légales</a></li><li><a href="/confidentialite">Confidentialité</a></li></ul></div>
   </div>

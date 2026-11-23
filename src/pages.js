@@ -17,7 +17,7 @@ export function forbidden(ctx) {
 }
 
 const PER_PAGE = 12;
-const SORTS = { nouveautes: ['Nouveautés', 'created_at DESC'], 'prix-asc': ['Prix croissant', 'price_cents ASC'], 'prix-desc': ['Prix décroissant', 'price_cents DESC'] };
+const SORTS = { nouveautes: ['Notre sélection', 'created_at DESC'], 'prix-asc': ['Prix croissant', 'price_cents ASC'], 'prix-desc': ['Prix décroissant', 'price_cents DESC'] };
 
 function pagination(ctx, total, page) {
   const pages = Math.ceil(total / PER_PAGE); if (pages <= 1) return '';
@@ -47,6 +47,7 @@ function listing(ctx, { where = '1=1', params = [], title, intro, crumbs, path }
 route('GET', '/', (ctx) => {
   const cats = db.prepare(`SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id=c.id AND p.active=1 AND p.deleted=0) n FROM categories c ORDER BY position,id`).all();
   const products = db.prepare('SELECT * FROM products WHERE active=1 AND deleted=0 ORDER BY (stock>0) DESC, created_at DESC LIMIT 8').all();
+  const hearts = db.prepare('SELECT * FROM products WHERE active=1 AND deleted=0 AND featured=1 ORDER BY (stock>0) DESC, created_at DESC LIMIT 4').all();
   const s = settings();
   ctx.html(layout(ctx, { image: parseImages(products[0] || {})[0] || '', body: html`
   <section class="hero">
@@ -70,6 +71,7 @@ route('GET', '/', (ctx) => {
     <h2 class="section-title">Nos univers</h2>
     <div class="cat-grid">${cats.map((c, i) => html`<a class="cat cat-${i % 4}" href="/categorie/${c.slug}"><span class="cat-name">${c.name}</span><span class="cat-desc">${c.description}</span><span class="cat-go">Découvrir →</span></a>`)}</div>
   </section>
+  ${hearts.length ? html`<section class="section wrap"><h2 class="section-title">Nos coups de cœur</h2><div class="grid">${hearts.map((p) => productCard(ctx, p))}</div><p class="center mt"><a class="btn btn-ghost" href="/coups-de-coeur">Tous nos coups de cœur</a></p></section>` : ''}
   <section class="section section-tint"><div class="wrap">
     <h2 class="section-title">La sélection</h2>
     ${products.length ? html`<div class="grid">${products.map((p) => productCard(ctx, p))}</div><p class="center mt"><a class="btn btn-ghost" href="/boutique">Voir toute la boutique</a></p>` : html`<p class="center muted">Les premiers produits arrivent très bientôt.</p>`}
@@ -83,6 +85,7 @@ route('GET', '/', (ctx) => {
 });
 
 /* ---------- Catalogue ---------- */
+route('GET', '/coups-de-coeur', (ctx) => ctx.html(layout(ctx, { title: 'Nos coups de cœur', description: 'Nos produits coups de cœur.', body: listing(ctx, { where: 'featured=1', title: 'Nos coups de cœur', intro: 'Les produits que nous aimons particulièrement', crumbs: [['Boutique', '/boutique'], ['Nos coups de cœur']], path: '/coups-de-coeur' }) })));
 route('GET', '/boutique', (ctx) => ctx.html(layout(ctx, { title: 'Boutique', description: 'Tous nos produits : brumes, parfums, maquillage et soins.', body: listing(ctx, { title: 'La boutique', intro: 'Tous nos produits', crumbs: [['Boutique']], path: '/boutique' }) })));
 route('GET', '/categorie/:slug', (ctx) => {
   const c = db.prepare('SELECT * FROM categories WHERE slug=?').get(ctx.params.slug);
@@ -271,7 +274,7 @@ info('/cgv', 'Conditions générales de vente', 'Conditions générales de vente
 route('GET', '/robots.txt', (ctx) => ctx.text(`User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /panier\nDisallow: /commande\nSitemap: ${siteUrl(ctx)}/sitemap.xml\n`));
 route('GET', '/sitemap.xml', (ctx) => {
   const u = siteUrl(ctx);
-  const urls = ['/', '/boutique', '/a-propos', '/livraison', '/retours', '/faq', '/contact', '/cgv', '/mentions-legales', '/confidentialite',
+  const urls = ['/', '/boutique', '/coups-de-coeur', '/a-propos', '/livraison', '/retours', '/faq', '/contact', '/cgv', '/mentions-legales', '/confidentialite',
     ...db.prepare('SELECT slug FROM categories').all().map((c) => `/categorie/${c.slug}`),
     ...db.prepare('SELECT slug FROM products WHERE active=1 AND deleted=0').all().map((p) => `/produit/${p.slug}`)];
   ctx.text(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((x) => `<url><loc>${esc(u + x)}</loc></url>`).join('')}</urlset>`, 200, 'application/xml; charset=utf-8');
