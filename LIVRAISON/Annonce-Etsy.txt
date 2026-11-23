@@ -1,0 +1,46 @@
+ANNONCE ETSY — FEUILLE VOLANTE (FeuilleVolanteCie)
+Prix de lancement envisagé : 19,90 €
+Type : téléchargement numérique (aucun envoi physique)
+Fichier à déposer : Calculateur-Food-Truck-Acheteur.zip
+Visuels à ajouter dans l'ordre : 01-Couverture.jpg, 02-Simulateur.jpg, 03-Cout-par-menu.jpg, 04-Emplacements.jpg
+(Copie les blocs TITRE, DESCRIPTION et TAGS. Cet en-tête est pour toi.)
+
+========== TITRE (140 caractères maximum) ==========
+Calculateur food truck | Combien de menus vendre pour couvrir tes frais | Coût par portion, marge, seuil de rentabilité | Tableur Excel
+
+========== DESCRIPTION ==========
+Avant de réserver un emplacement, calcule combien de menus tu dois vendre pour couvrir tes frais.
+
+Ce tableur Excel en français est fait pour les food trucks qui vendent sur les marchés, les festivals et les événements privés. Tu saisis tes coûts, il te donne ton seuil de rentabilité en nombre de menus.
+
+CE QUE TU REÇOIS (un seul téléchargement, un fichier ZIP) :
+• Calculateur-Food-Truck.xlsx : un tableur modifiable, sans macro, avec 3 onglets
+• Guide-Calculateur-Food-Truck.pdf : un guide de 4 pages en français
+
+LES 3 ONGLETS
+1. Coût par menu : ingrédients, quantités, prix unitaires, emballage, prix de vente. Tu obtiens le coût par portion et la marge par menu. Le guide explique comment saisir 150 g d'un ingrédient acheté au kilo.
+2. Événement : emplacement, trajet, personnel, autres frais et menus prévus. Tu obtiens le nombre entier de menus à vendre pour couvrir les frais et le résultat estimé.
+3. Emplacements : compare 3 événements avec un scénario prudent, central et haut pour chacun. La marge par menu est commune aux trois emplacements (elle vient de l'onglet Coût par menu).
+
+EXEMPLE INCLUS
+Menu vendu 12 €, coût variable 7 €, marge de 5 €. Avec 300 € de frais, le seuil est de 60 menus. À 85 menus vendus, le résultat estimé est de 125 €. Avec 301 € de frais, le seuil passe à 61 menus.
+
+FACILE À UTILISER
+• Les cellules bleues sont à modifier, les cellules calculées sont repérées
+• Montants en euros, avec le choix d'une base HT ou TTC à garder cohérente partout
+• Une case vide n'est pas un coût de 0 € : saisis 0 pour un frais qui ne s'applique pas
+• Si la marge est nulle ou négative, un message clair remplace le seuil
+
+BON À SAVOIR
+• Fichier conçu pour Excel (.xlsx). Les exemples sont fictifs : remplace-les par tes chiffres.
+• Les résultats sont des estimations basées sur les coûts que tu saisis. Ils ne comprennent ni les frais oubliés, ni les charges, ni les impôts. Ce n'est pas un conseil comptable ou fiscal.
+• Produit numérique : téléchargement après l'achat, aucun objet physique envoyé. Décompresse le ZIP pour accéder aux deux fichiers.
+
+========== 13 TAGS (20 caractères maximum chacun) ==========
+food truck, calcul marge, tableur food truck, seuil rentabilité, coût par portion, coût de revient, marge food truck, calcul coût recette, modèle Excel, tableur xlsx, food truck festival, gestion food truck, restauration mobile
+
+========== TEXTE ALTERNATIF DES VISUELS ==========
+01-Couverture.jpg : Visuel « Combien de menus vendre pour couvrir tes frais ? » avec l'exemple : 300 € de frais divisés par 5 € de marge par menu égalent 60 menus ; à 85 menus vendus, résultat estimé de 125 €. Tableur Excel en français pour food truck.
+02-Simulateur.jpg : Capture de l'onglet Événement du tableur : frais d'emplacement 180 €, trajet 35 €, personnel 65 €, autres frais 20 €, total 300 €, 85 menus prévus, seuil de 60 menus et résultat estimé de 125 €.
+03-Cout-par-menu.jpg : Capture de l'onglet Coût par menu : lignes d'ingrédients et d'emballage d'un menu burger, coût variable de 7 €, prix de vente de 12 €, marge de 5 € par menu (41,7 %).
+04-Emplacements.jpg : Capture de l'onglet Emplacements : comparaison d'un marché, d'un festival et d'une privatisation avec les menus à vendre (24, 60 et 44) et les résultats estimés dans trois scénarios de ventes.
