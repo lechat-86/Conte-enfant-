@@ -4,6 +4,9 @@ import { html, raw, eur, fromCents, nl2br, isEmail, clampInt, esc } from './util
 import { layout, productCard, productImage, priceBlock, stockBadge, csrf, pageHead, breadcrumb, icon, todo } from './views.js';
 import { cartInfo, parseImages } from './cart.js';
 import { mailContact } from './mail.js';
+import { listProducts, getProduct, relatedProducts, allProductSlugs } from './catalog.js';
+import { shopifyOn, fetchCart, cartAdd, cartSetQty, cartView } from './shopify.js';
+import { payName } from './views.js';
 
 /* ---------- Erreurs ---------- */
 export function notFound(ctx) {
@@ -31,12 +34,10 @@ function chips(path) {
   return html`<nav class="chips" aria-label="Filtrer par catégorie">${items.map(([l, h]) => html`<a href="${h}" class="${h === path ? 'on' : ''}" ${h === path ? raw('aria-current="page"') : ''}>${l}</a>`)}</nav>`;
 }
 
-function listing(ctx, { where = '1=1', params = [], title, intro, crumbs, path }) {
+async function listing(ctx, { cat = '', featured = false, title, intro, crumbs, path }) {
   const sort = SORTS[ctx.query.tri] ? ctx.query.tri : 'nouveautes';
   const page = clampInt(ctx.query.page, 1, 999, 1);
-  const base = `FROM products WHERE active=1 AND deleted=0 AND ${where}`;
-  const total = db.prepare(`SELECT COUNT(*) c ${base}`).get(...params).c;
-  const items = db.prepare(`SELECT * ${base} ORDER BY (stock>0) DESC, ${SORTS[sort][1]} LIMIT ? OFFSET ?`).all(...params, PER_PAGE, (page - 1) * PER_PAGE);
+  const { total, items } = await listProducts({ cat, featured, sort, page, perPage: PER_PAGE });
   return html`${pageHead(title, intro)}
   <section class="wrap section-sm">
     ${breadcrumb(crumbs)}
@@ -51,10 +52,10 @@ function listing(ctx, { where = '1=1', params = [], title, intro, crumbs, path }
 }
 
 /* ---------- Accueil ---------- */
-route('GET', '/', (ctx) => {
-  const cats = db.prepare(`SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id=c.id AND p.active=1 AND p.deleted=0) n FROM categories c ORDER BY position,id`).all();
-  const products = db.prepare('SELECT * FROM products WHERE active=1 AND deleted=0 ORDER BY (stock>0) DESC, created_at DESC LIMIT 8').all();
-  const hearts = db.prepare('SELECT * FROM products WHERE active=1 AND deleted=0 AND featured=1 ORDER BY (stock>0) DESC, created_at DESC LIMIT 4').all();
+route('GET', '/', async (ctx) => {
+  const cats = db.prepare('SELECT * FROM categories ORDER BY position,id').all();
+  const products = (await listProducts({ perPage: 8 })).items;
+  const hearts = (await listProducts({ featured: true, perPage: 4 })).items;
   const s = settings();
   ctx.html(layout(ctx, { image: parseImages(products[0] || {})[0] || '', body: html`
   <section class="hero">
@@ -69,7 +70,7 @@ route('GET', '/', (ctx) => {
     </div>
   </section>
   <section class="reassure"><div class="wrap reassure-in">
-    <div>${icon.lock}<b>Paiement sécurisé</b><span>Carte bancaire via Stripe</span></div>
+    <div>${icon.lock}<b>Paiement sécurisé</b><span>Carte bancaire via ${payName()}</span></div>
     <div>${icon.box}<b>Préparé avec soin</b><span>Chaque commande est emballée à la main</span></div>
     <div>${icon.mail}<b>Suivi par e-mail</b><span>Confirmation et expédition</span></div>
     <div>${icon.heart}<b>Une sélection exigeante</b><span>Produits choisis auprès de fournisseurs européens</span></div>
@@ -92,17 +93,16 @@ route('GET', '/', (ctx) => {
 });
 
 /* ---------- Catalogue ---------- */
-route('GET', '/coups-de-coeur', (ctx) => ctx.html(layout(ctx, { title: 'Nos coups de cœur', description: 'Nos produits coups de cœur.', body: listing(ctx, { where: 'featured=1', title: 'Nos coups de cœur', intro: 'Les produits que nous aimons particulièrement', crumbs: [['Boutique', '/boutique'], ['Nos coups de cœur']], path: '/coups-de-coeur' }) })));
-route('GET', '/boutique', (ctx) => ctx.html(layout(ctx, { title: 'Boutique', description: 'Tous nos produits : parfums, brumes, parfums de maison et maquillage.', body: listing(ctx, { title: 'La boutique', intro: 'Tous nos produits', crumbs: [['Boutique']], path: '/boutique' }) })));
-route('GET', '/categorie/:slug', (ctx) => {
+route('GET', '/coups-de-coeur', async (ctx) => ctx.html(layout(ctx, { title: 'Nos coups de cœur', description: 'Nos produits coups de cœur.', body: await listing(ctx, { featured: true, title: 'Nos coups de cœur', intro: 'Les produits que nous aimons particulièrement', crumbs: [['Boutique', '/boutique'], ['Nos coups de cœur']], path: '/coups-de-coeur' }) })));
+route('GET', '/boutique', async (ctx) => ctx.html(layout(ctx, { title: 'Boutique', description: 'Tous nos produits : parfums, brumes, parfums de maison et maquillage.', body: await listing(ctx, { title: 'La boutique', intro: 'Tous nos produits', crumbs: [['Boutique']], path: '/boutique' }) })));
+route('GET', '/categorie/:slug', async (ctx) => {
   const c = db.prepare('SELECT * FROM categories WHERE slug=?').get(ctx.params.slug);
   if (!c) return;
-  ctx.html(layout(ctx, { title: c.name, description: c.description, body: listing(ctx, { where: 'category_id=?', params: [c.id], title: c.name, intro: c.description, crumbs: [['Boutique', '/boutique'], [c.name]], path: `/categorie/${c.slug}` }) }));
+  ctx.html(layout(ctx, { title: c.name, description: c.description, body: await listing(ctx, { cat: c.slug, title: c.name, intro: c.description, crumbs: [['Boutique', '/boutique'], [c.name]], path: `/categorie/${c.slug}` }) }));
 });
-route('GET', '/recherche', (ctx) => {
+route('GET', '/recherche', async (ctx) => {
   const q = String(ctx.query.q || '').trim().slice(0, 60);
-  const like = `%${q.replace(/[%_\\]/g, '\\$&')}%`;
-  const items = q ? db.prepare(`SELECT * FROM products WHERE active=1 AND deleted=0 AND (name LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\' OR short_desc LIKE ? ESCAPE '\\') ORDER BY (stock>0) DESC LIMIT 48`).all(like, like, like) : [];
+  const items = q ? (await listProducts({ q, perPage: 48 })).items : [];
   ctx.html(layout(ctx, { title: 'Recherche', noindex: true, body: html`${pageHead('Rechercher')}<section class="wrap section-sm">
     <form class="searchbar" method="get" action="/recherche"><input type="search" name="q" value="${q}" placeholder="Un produit, une marque…" aria-label="Rechercher" autofocus><button class="btn">Rechercher</button></form>
     ${q ? (items.length ? html`<p class="muted">${items.length} résultat${items.length > 1 ? 's' : ''} pour « ${q} »</p><div class="grid">${items.map((p) => productCard(ctx, p))}</div>` : html`<div class="empty"><p>Aucun résultat pour « ${q} ».</p></div>`) : ''}
@@ -110,11 +110,11 @@ route('GET', '/recherche', (ctx) => {
 });
 
 /* ---------- Fiche produit ---------- */
-route('GET', '/produit/:slug', (ctx) => {
-  const p = db.prepare('SELECT p.*, c.name cat_name, c.slug cat_slug FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.slug=? AND p.active=1 AND p.deleted=0').get(ctx.params.slug);
+route('GET', '/produit/:slug', async (ctx) => {
+  const p = await getProduct(ctx.params.slug);
   if (!p) return;
   const s = settings(); const imgs = parseImages(p);
-  const related = p.category_id ? db.prepare('SELECT * FROM products WHERE category_id=? AND id<>? AND active=1 AND deleted=0 AND stock>0 ORDER BY created_at DESC LIMIT 4').all(p.category_id, p.id) : [];
+  const related = await relatedProducts(p);
   const ld = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Product', name: p.name, brand: p.brand ? { '@type': 'Brand', name: p.brand } : undefined, description: p.short_desc || undefined, image: imgs.map((i) => siteUrl(ctx) + i), offers: { '@type': 'Offer', priceCurrency: 'EUR', price: (p.price_cents / 100).toFixed(2), availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', url: `${siteUrl(ctx)}/produit/${p.slug}` } }).replace(/</g, '\\u003c');
   ctx.html(layout(ctx, {
     title: `${p.name}${p.brand ? ' ' + p.brand : ''}`, description: p.short_desc, image: imgs[0] || '',
@@ -133,12 +133,12 @@ route('GET', '/produit/:slug', (ctx) => {
           <p class="pdp-price">${priceBlock(p)} <small class="muted">TTC</small></p>
           ${p.short_desc ? html`<p>${p.short_desc}</p>` : ''}
           <p class="stock ${p.stock > 0 ? 'ok' : 'ko'}">${p.stock <= 0 ? 'Actuellement épuisé' : p.stock <= p.low_stock ? `Plus que ${p.stock} en stock` : 'En stock'}</p>
-          ${p.stock > 0 ? html`<form method="post" action="/panier/ajouter" class="buy">${csrf(ctx)}<input type="hidden" name="product_id" value="${p.id}"><input type="hidden" name="back" value="/produit/${p.slug}">
+          ${p.stock > 0 ? html`<form method="post" action="/panier/ajouter" class="buy">${csrf(ctx)}${p.variants?.length > 1 ? html`<label class="variant">Choix <select name="product_id">${p.variants.map((v) => html`<option value="${v.id}" ${v.available ? '' : raw('disabled')}>${v.title}${v.available ? '' : ' (épuisé)'} — ${eur(v.price_cents)}</option>`)}</select></label>` : html`<input type="hidden" name="product_id" value="${p.id}">`}<input type="hidden" name="back" value="/produit/${p.slug}">
             <div class="qty" data-max="${p.stock}"><button type="button" data-d="-1" aria-label="Moins">−</button><input name="qty" value="1" inputmode="numeric" aria-label="Quantité"><button type="button" data-d="1" aria-label="Plus">+</button></div>
             <button class="btn btn-lg">Ajouter au panier</button></form>` : html`<p><a class="btn btn-ghost" href="/contact">Nous contacter pour être prévenue du retour en stock</a></p>`}
           <ul class="pdp-points"><li>${icon.lock}<span>Paiement sécurisé par carte</span></li><li>${icon.box}<span>Expédition soignée depuis la boutique</span></li></ul>
           <details open><summary>Description</summary><div class="details-body"><p>${nl2br(p.description || p.short_desc)}</p></div></details>
-          <details><summary>Livraison &amp; retours</summary><div class="details-body"><p>Frais de livraison : ${eur(parseInt(s.shipping_flat_cents, 10) || 0)}${parseInt(s.free_shipping_cents, 10) ? `, offerts dès ${eur(parseInt(s.free_shipping_cents, 10))} d’achat` : ''}. <a href="/livraison">Détails de livraison</a> · <a href="/retours">Retours</a></p></div></details>
+          <details><summary>Livraison &amp; retours</summary><div class="details-body"><p>${shopifyOn() ? 'Frais de livraison calculés au moment du paiement.' : `Frais de livraison : ${eur(parseInt(s.shipping_flat_cents, 10) || 0)}${parseInt(s.free_shipping_cents, 10) ? `, offerts dès ${eur(parseInt(s.free_shipping_cents, 10))} d’achat` : ''}.`} <a href="/livraison">Détails de livraison</a> · <a href="/retours">Retours</a></p></div></details>
         </div>
       </div>
       ${related.length ? html`<h2 class="section-title mt">Vous aimerez aussi</h2><div class="grid">${related.map((r) => productCard(ctx, r))}</div>` : ''}
@@ -147,7 +147,13 @@ route('GET', '/produit/:slug', (ctx) => {
 });
 
 /* ---------- Panier ---------- */
-route('POST', '/panier/ajouter', (ctx) => {
+route('POST', '/panier/ajouter', async (ctx) => {
+  if (shopifyOn()) { // Mode Shopify : le panier vit chez Shopify
+    const back = /^\/[a-z0-9\-/_]*$/i.test(ctx.body.back || '') ? ctx.body.back : '/boutique';
+    try { await cartAdd(ctx, String(ctx.body.product_id || ''), clampInt(ctx.body.qty, 1, 99, 1)); ctx.flash('ok', 'Produit ajouté au panier.'); }
+    catch (e) { console.error(e.message); ctx.flash('error', e.user ? 'Ce produit n’est pas disponible dans cette quantité.' : 'Le panier est momentanément indisponible. Réessayez dans un instant.'); }
+    return ctx.redirect(ctx.body.go === 'cart' ? '/panier' : back);
+  }
   const id = clampInt(ctx.body.product_id, 1, 1e9, 0); const qty = clampInt(ctx.body.qty, 1, 99, 1);
   const p = db.prepare('SELECT * FROM products WHERE id=? AND active=1 AND deleted=0').get(id);
   const back = /^\/[a-z0-9\-/_]*$/i.test(ctx.body.back || '') ? ctx.body.back : '/boutique';
@@ -158,13 +164,21 @@ route('POST', '/panier/ajouter', (ctx) => {
   ctx.flash(next < cur + qty ? 'warn' : 'ok', next < cur + qty ? `Stock limité : ${p.stock} disponible(s) pour « ${p.name} ».` : `« ${p.name} » ajouté au panier.`);
   ctx.redirect(ctx.body.go === 'cart' ? '/panier' : back);
 });
-route('POST', '/panier/modifier', (ctx) => {
+route('POST', '/panier/modifier', async (ctx) => {
+  if (shopifyOn()) {
+    try { await cartSetQty(ctx, String(ctx.body.product_id || ''), clampInt(ctx.body.qty, 0, 99, 0)); }
+    catch (e) { console.error(e.message); ctx.flash('error', e.user ? 'Quantité non disponible.' : 'Le panier est momentanément indisponible.'); }
+    return ctx.redirect('/panier');
+  }
   const id = clampInt(ctx.body.product_id, 1, 1e9, 0); const qty = clampInt(ctx.body.qty, 0, 99, 0);
   if (qty <= 0) delete ctx.session.cart[id]; else ctx.session.cart[id] = qty;
   ctx.touch(); ctx.redirect('/panier');
 });
-route('GET', '/panier', (ctx) => {
-  const c = cartInfo(ctx); const s = settings();
+route('GET', '/panier', async (ctx) => {
+  let c;
+  if (shopifyOn()) { try { c = cartView(await fetchCart(ctx)); } catch (e) { console.error(e.message); c = cartView(null); ctx.flash('error', 'Le panier est momentanément indisponible.'); } }
+  else c = cartInfo(ctx);
+  const s = settings();
   c.notices.forEach((m) => ctx.flash('warn', m));
   const free = parseInt(s.free_shipping_cents, 10) || 0;
   ctx.html(layout(ctx, { title: 'Panier', noindex: true, body: html`${pageHead('Mon panier')}<section class="wrap section-sm">
@@ -177,11 +191,11 @@ route('GET', '/panier', (ctx) => {
             <button class="link-btn">Mettre à jour</button><button class="link-btn danger" name="qty" value="0">Retirer</button></form></div>
         <div class="line-total">${eur(l.total)}</div></div>`)}</div>
       <aside class="summary"><h2>Récapitulatif</h2>
-        <dl><dt>Sous-total</dt><dd>${eur(c.subtotal)}</dd><dt>Livraison</dt><dd>${c.shipping ? eur(c.shipping) : 'Offerte'}</dd></dl>
-        ${free && c.subtotal < free ? html`<p class="hint">Plus que ${eur(free - c.subtotal)} pour la livraison offerte ✨</p>` : ''}
+        <dl><dt>Sous-total</dt><dd>${eur(c.subtotal)}</dd><dt>Livraison</dt><dd>${c.shipping === null ? 'Calculée au paiement' : c.shipping ? eur(c.shipping) : 'Offerte'}</dd></dl>
+        ${!c.shopify && free && c.subtotal < free ? html`<p class="hint">Plus que ${eur(free - c.subtotal)} pour la livraison offerte ✨</p>` : ''}
         <dl class="total"><dt>Total TTC</dt><dd>${eur(c.total)}</dd></dl>
         <a class="btn btn-block btn-lg" href="/commande">Passer la commande</a>
-        <p class="secure">${icon.lock} Paiement sécurisé par Stripe</p>
+        <p class="secure">${icon.lock} Paiement sécurisé par ${payName()}</p>
         <p class="center"><a class="link" href="/boutique">Continuer mes achats</a></p></aside></div>`
       : html`<div class="empty"><p>Votre panier est vide.</p><p><a class="btn" href="/boutique">Découvrir la boutique</a></p></div>`}
   </section>` }));
@@ -226,7 +240,7 @@ info('/a-propos', 'Notre univers', 'Découvrez SHAÏ & GLOW, boutique de beauté
 
 info('/livraison', 'Livraison', 'Modes, délais et frais de livraison.', (s) => html`
   <h2>Frais de livraison</h2>
-  <p>Livraison : <b>${eur(parseInt(s.shipping_flat_cents, 10) || 0)}</b>${parseInt(s.free_shipping_cents, 10) ? html` — <b>offerte dès ${eur(parseInt(s.free_shipping_cents, 10))}</b> d’achat` : ''}. Les frais sont affichés avant le paiement.</p>
+  ${shopifyOn() ? html`<p>Les frais de livraison sont calculés à l’étape de paiement selon votre adresse, et affichés avant que vous ne validiez votre commande.</p>` : html`<p>Livraison : <b>${eur(parseInt(s.shipping_flat_cents, 10) || 0)}</b>${parseInt(s.free_shipping_cents, 10) ? html` — <b>offerte dès ${eur(parseInt(s.free_shipping_cents, 10))}</b> d’achat` : ''}. Les frais sont affichés avant le paiement.</p>`}
   <h2>Pays livrés</h2><p>${N(s.shipping_countries)}</p>
   <h2>Délais</h2>
   <p>Préparation de la commande : ${N(s.prep_delay)}.<br>Livraison : ${N(s.delivery_delay)}${s.carrier_name ? html` via ${s.carrier_name}` : ''}.</p>
@@ -242,7 +256,7 @@ info('/retours', 'Retours & remboursements', 'Droit de rétractation et procédu
   <h2>Produit endommagé ou erreur</h2><p>Contactez-nous rapidement avec une photo : nous trouverons une solution (échange ou remboursement).</p>`);
 
 info('/faq', 'Questions fréquentes', 'Réponses aux questions les plus courantes.', (s) => html`
-  <details open><summary>Comment payer ma commande ?</summary><div class="details-body"><p>Par carte bancaire, via la page de paiement sécurisée Stripe. Nous ne voyons ni ne conservons vos données bancaires.</p></div></details>
+  <details open><summary>Comment payer ma commande ?</summary><div class="details-body"><p>Par carte bancaire, via la page de paiement sécurisée ${payName()}. Nous ne voyons ni ne conservons vos données bancaires.</p></div></details>
   <details><summary>Quand vais-je recevoir ma commande ?</summary><div class="details-body"><p>Consultez notre page <a href="/livraison">Livraison</a>. Vous êtes prévenue par e-mail à l’expédition.</p></div></details>
   <details><summary>Puis-je retourner un produit ?</summary><div class="details-body"><p>Oui, dans les conditions décrites sur la page <a href="/retours">Retours</a> (produits non ouverts).</p></div></details>
   <details><summary>Où trouver la composition d’un produit ?</summary><div class="details-body"><p>Sur l’emballage du produit. Une question sur un ingrédient ou une allergie ? <a href="/contact">Écrivez-nous</a> avant de commander.</p></div></details>
@@ -260,7 +274,7 @@ info('/confidentialite', 'Politique de confidentialité', 'Protection de vos don
   <p>Responsable du traitement : ${N(s.company_name || s.shop_name)} — contact : ${N(s.contact_email)}.</p>
   <h2>Données collectées</h2><p>Lors d’une commande ou de la création d’un compte : nom, prénom, e-mail, téléphone, adresse de livraison, historique de commandes. Via le formulaire de contact : nom, e-mail et message.</p>
   <h2>Finalités</h2><p>Traiter et livrer vos commandes, gérer votre compte, répondre à vos demandes, respecter nos obligations légales (comptabilité, facturation).</p>
-  <h2>Paiement</h2><p>Le paiement est géré par Stripe. Vos données de carte bancaire sont saisies sur la page sécurisée de Stripe et ne sont jamais enregistrées sur ce site.</p>
+  <h2>Paiement</h2><p>Le paiement est géré par ${payName()}. Vos données de carte bancaire sont saisies sur la page sécurisée de ${payName()} et ne sont jamais enregistrées sur ce site.</p>
   <h2>Destinataires</h2><p>Vos données sont uniquement accessibles à ${s.shop_name} et à ses prestataires techniques nécessaires au service (paiement, envoi d’e-mails, hébergement, transporteur).</p>
   <h2>Durée de conservation</h2><p>Les données de commande sont conservées pendant la durée légale (10 ans pour les pièces comptables). Les données de compte sont conservées tant que le compte existe.</p>
   <h2>Vos droits</h2><p>Accès, rectification, effacement, opposition, limitation, portabilité : écrivez-nous à ${N(s.contact_email)}. Vous pouvez également saisir la CNIL (cnil.fr).</p>
@@ -270,8 +284,8 @@ info('/cgv', 'Conditions générales de vente', 'Conditions générales de vente
   <h2>1. Vendeur</h2><p>${N(s.company_name || s.shop_name)} — SIRET ${N(s.siret)} — ${N(s.company_address)} — ${N(s.contact_email)}.</p>
   <h2>2. Produits et prix</h2><p>Les produits sont décrits avec la plus grande exactitude possible. Les prix sont indiqués en euros, toutes taxes comprises${s.vat_mode === 'franchise' ? ' (TVA non applicable, art. 293 B du CGI)' : ''}, hors frais de livraison. Les prix peuvent être modifiés à tout moment, le prix applicable est celui affiché lors de la validation de la commande. Les offres sont valables dans la limite des stocks disponibles.</p>
   <h2>3. Commande</h2><p>La commande est confirmée après paiement. Un e-mail de confirmation est envoyé. Nous nous réservons le droit d’annuler et de rembourser une commande en cas de rupture de stock ou d’erreur manifeste de prix.</p>
-  <h2>4. Paiement</h2><p>Le paiement s’effectue en ligne par carte bancaire (ou autres moyens proposés sur la page de paiement) via Stripe, de manière sécurisée.</p>
-  <h2>5. Livraison</h2><p>Frais : ${eur(parseInt(s.shipping_flat_cents, 10) || 0)}${parseInt(s.free_shipping_cents, 10) ? `, offerts dès ${eur(parseInt(s.free_shipping_cents, 10))}` : ''}. Pays desservis : ${N(s.shipping_countries)}. Délai de préparation : ${N(s.prep_delay)}. Délai de livraison : ${N(s.delivery_delay)}. Les délais sont indicatifs ; en cas de retard de plus de 30 jours, vous pouvez annuler la commande.</p>
+  <h2>4. Paiement</h2><p>Le paiement s’effectue en ligne par carte bancaire (ou autres moyens proposés sur la page de paiement) via ${payName()}, de manière sécurisée.</p>
+  <h2>5. Livraison</h2><p>Frais : ${shopifyOn() ? 'calculés au moment du paiement' : `${eur(parseInt(s.shipping_flat_cents, 10) || 0)}${parseInt(s.free_shipping_cents, 10) ? `, offerts dès ${eur(parseInt(s.free_shipping_cents, 10))}` : ''}`}. Pays desservis : ${N(s.shipping_countries)}. Délai de préparation : ${N(s.prep_delay)}. Délai de livraison : ${N(s.delivery_delay)}. Les délais sont indicatifs ; en cas de retard de plus de 30 jours, vous pouvez annuler la commande.</p>
   <h2>6. Droit de rétractation</h2><p>Vous disposez de 14 jours après réception pour vous rétracter (voir la page <a href="/retours">Retours</a>). Conformément à l’article L.221-28 du Code de la consommation, ce droit ne s’applique pas aux produits scellés ne pouvant être renvoyés pour des raisons d’hygiène ou de protection de la santé et qui ont été descellés après la livraison.</p>
   <h2>7. Garanties légales</h2><p>Le vendeur reste tenu de la garantie légale de conformité (articles L.217-3 et suivants du Code de la consommation) et de la garantie des vices cachés (articles 1641 et suivants du Code civil).</p>
   <h2>8. Données personnelles</h2><p>Voir notre <a href="/confidentialite">politique de confidentialité</a>.</p>
@@ -279,10 +293,10 @@ info('/cgv', 'Conditions générales de vente', 'Conditions générales de vente
 
 /* ---------- SEO ---------- */
 route('GET', '/robots.txt', (ctx) => ctx.text(`User-agent: *\nDisallow: /admin\nDisallow: /compte\nDisallow: /panier\nDisallow: /commande\nSitemap: ${siteUrl(ctx)}/sitemap.xml\n`));
-route('GET', '/sitemap.xml', (ctx) => {
+route('GET', '/sitemap.xml', async (ctx) => {
   const u = siteUrl(ctx);
   const urls = ['/', '/boutique', '/coups-de-coeur', '/a-propos', '/livraison', '/retours', '/faq', '/contact', '/cgv', '/mentions-legales', '/confidentialite',
     ...db.prepare('SELECT slug FROM categories').all().map((c) => `/categorie/${c.slug}`),
-    ...db.prepare('SELECT slug FROM products WHERE active=1 AND deleted=0').all().map((p) => `/produit/${p.slug}`)];
+    ...(await allProductSlugs()).map((x) => `/produit/${x}`)];
   ctx.text(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((x) => `<url><loc>${esc(u + x)}</loc></url>`).join('')}</urlset>`, 200, 'application/xml; charset=utf-8');
 });

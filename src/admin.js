@@ -9,6 +9,7 @@ import { parseImages } from './cart.js';
 import { STATUS, orderItems, cancelPending, expireStaleOrders } from './orders.js';
 import { mailShipped } from './mail.js';
 import { stripeApi, stripeEnabled } from './stripe.js';
+import { shopifyOn, shopifyAdminUrl } from './shopify.js';
 
 /* ---------- Gabarit admin ---------- */
 const NAV = [['/admin', 'Tableau de bord'], ['/admin/commandes', 'Commandes'], ['/admin/produits', 'Produits'], ['/admin/stocks', 'Stocks'], ['/admin/categories', 'Catégories'], ['/admin/clients', 'Clientes'], ['/admin/messages', 'Messages'], ['/admin/reglages', 'Réglages']];
@@ -24,7 +25,7 @@ function adminPage(ctx, active, title, body, status = 200) {
     <nav>${NAV.map(([href, label]) => html`<a href="${href}" class="${active === href ? 'on' : ''}">${label}${href === '/admin/commandes' && toShip ? html`<b class="dot">${toShip}</b>` : ''}${href === '/admin/messages' && unread ? html`<b class="dot">${unread}</b>` : ''}</a>`)}</nav>
     <a class="adm-view" href="/" target="_blank">Voir la boutique ↗</a>
     <form method="post" action="/compte/deconnexion"><input type="hidden" name="_csrf" value="${ctx.session.csrf}"><button class="link-btn">Déconnexion</button></form></aside>
-  <main class="adm-main"><h1 class="adm-title">${title}</h1>${flash ? html`<div class="flash flash-${flash.type}" role="status">${flash.msg}</div>` : ''}${body}</main>
+  <main class="adm-main"><h1 class="adm-title">${title}</h1>${shopifyOn() ? html`<div class="notice mb"><b>Mode Shopify actif.</b> Les produits, stocks et commandes se gèrent dans <a class="link" href="${shopifyAdminUrl()}" target="_blank" rel="noopener">l’administration Shopify ↗</a>. Les pages Produits / Stocks / Commandes ci-dessous concernent l’ancienne base locale (conservée, inutilisée tant que Shopify est actif).</div>` : ''}${flash ? html`<div class="flash flash-${flash.type}" role="status">${flash.msg}</div>` : ''}${body}</main>
 </div><script src="/js/admin.js" defer></script></body></html>`, status);
 }
 const A = (p, handler, method = 'GET', opts) => route(method, p, async (ctx) => {

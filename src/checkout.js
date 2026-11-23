@@ -4,6 +4,7 @@ import { html, raw, eur, isEmail, randomToken, fmtDate } from './util.js';
 import { layout, csrf, pageHead, icon, productImage } from './views.js';
 import { cartInfo } from './cart.js';
 import { stripeApi, stripeEnabled, verifyWebhook } from './stripe.js';
+import { shopifyOn, fetchCart } from './shopify.js';
 import { markPaid, cancelPending, expireStaleOrders, orderItems } from './orders.js';
 
 const countriesOf = () => { const l = settings().shipping_countries.split(',').map((c) => c.trim()).filter(Boolean); return l.length ? l : ['France']; };
@@ -41,13 +42,19 @@ function checkoutPage(ctx, c, v = {}) {
     </form></section>` });
 }
 
-route('GET', '/commande', (ctx) => {
+route('GET', '/commande', async (ctx) => {
+  if (shopifyOn()) { // Mode Shopify : paiement sur le checkout hébergé par Shopify (sans compte obligatoire côté site)
+    try { const cart = await fetchCart(ctx); if (cart?.lines.nodes.length && cart.checkoutUrl) return ctx.redirect(cart.checkoutUrl, 302); }
+    catch (e) { console.error(e.message); ctx.flash('error', 'Le paiement est momentanément indisponible. Réessayez dans un instant.'); }
+    return ctx.redirect('/panier');
+  }
   const c = cartInfo(ctx); c.notices.forEach((m) => ctx.flash('warn', m));
   if (!c.lines.length) return ctx.redirect('/panier');
   ctx.html(checkoutPage(ctx, c));
 });
 
 route('POST', '/commande', async (ctx) => {
+  if (shopifyOn()) return ctx.redirect('/commande');
   const c = cartInfo(ctx); c.notices.forEach((m) => ctx.flash('warn', m));
   if (!c.lines.length) return ctx.redirect('/panier');
   const f = (k, n = 120) => ctx.form(k).slice(0, n);

@@ -199,3 +199,6 @@ code{background:var(--blush);padding:.1rem .4rem;border-radius:6px;font-size:.88
 .chips a{flex:none;padding:.45rem 1.1rem;border-radius:999px;border:1px solid var(--sand);background:#fff;text-decoration:none;font-size:.88rem;letter-spacing:.04em;min-height:38px;display:inline-flex;align-items:center}
 .chips a:hover{background:var(--blush)}.chips a.on{background:var(--rg-dark);border-color:var(--rg-dark);color:#fff}
 @media(min-width:700px){.chips{flex-wrap:wrap;justify-content:center;overflow:visible}}
+
+.mb{margin-bottom:1rem}.variant{display:grid;gap:.35rem;font-size:.9rem;color:var(--muted);margin-top:1rem}
+.line-img{text-decoration:none}.buy .variant{flex-basis:100%;margin-top:0}

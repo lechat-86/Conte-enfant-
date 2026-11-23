@@ -19,6 +19,8 @@ export const icon = {
   mail: raw('<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>'),
 };
 
+import { shopifyOn } from './shopify.js';
+export const payName = () => (shopifyOn() ? 'Shopify' : 'Stripe');
 export const todo = (v) => (String(v || '').trim() ? v : raw('<span class="todo">à compléter</span>'));
 
 export function wordmark() {
@@ -88,7 +90,7 @@ ${s.announcement ? html`<div class="announce">${s.announcement}</div>` : ''}
     <nav class="nav" id="mainNav" aria-label="Navigation principale">${nav}</nav>
     <div class="header-actions">
       <a class="icon-btn" href="/recherche" aria-label="Rechercher">${icon.search}</a>
-      <a class="icon-btn" href="${ctx.user ? '/compte' : '/compte/connexion'}" aria-label="Mon compte">${icon.user}</a>
+      ${shopifyOn() ? '' : html`<a class="icon-btn" href="${ctx.user ? '/compte' : '/compte/connexion'}" aria-label="Mon compte">${icon.user}</a>`}
       <a class="icon-btn cart-btn" href="/panier" aria-label="Panier (${n})">${icon.bag}${n ? html`<span class="cart-count">${n}</span>` : ''}</a>
     </div>
   </div>
@@ -104,10 +106,10 @@ ${body}
       ${s.instagram || s.tiktok ? html`<p class="social">${s.instagram ? html`<a href="${s.instagram}" rel="noopener" target="_blank">Instagram</a>` : ''}${s.tiktok ? html`<a href="${s.tiktok}" rel="noopener" target="_blank">TikTok</a>` : ''}</p>` : ''}
     </div>
     <div><h4>Boutique</h4><ul>${cats.map((c) => html`<li><a href="/categorie/${c.slug}">${c.name}</a></li>`)}<li><a href="/coups-de-coeur">Nos coups de cœur</a></li></ul></div>
-    <div><h4>Aide</h4><ul><li><a href="/livraison">Livraison</a></li><li><a href="/retours">Retours &amp; remboursements</a></li><li><a href="/faq">Questions fréquentes</a></li><li><a href="/contact">Nous contacter</a></li><li><a href="/compte">Mon compte</a></li></ul></div>
+    <div><h4>Aide</h4><ul><li><a href="/livraison">Livraison</a></li><li><a href="/retours">Retours &amp; remboursements</a></li><li><a href="/faq">Questions fréquentes</a></li><li><a href="/contact">Nous contacter</a></li>${shopifyOn() ? '' : html`<li><a href="/compte">Mon compte</a></li>`}</ul></div>
     <div><h4>Informations</h4><ul><li><a href="/a-propos">Notre univers</a></li><li><a href="/cgv">Conditions générales de vente</a></li><li><a href="/mentions-legales">Mentions légales</a></li><li><a href="/confidentialite">Confidentialité</a></li></ul></div>
   </div>
-  <div class="footer-bottom"><span>© ${new Date().getFullYear()} ${s.shop_name}</span><span>Paiement sécurisé par Stripe</span></div>
+  <div class="footer-bottom"><span>© ${new Date().getFullYear()} ${s.shop_name}</span><span>Paiement sécurisé par ${payName()}</span></div>
 </footer>
 <script src="/js/app.js?v=${ver('js/app.js')}" defer></script>
 </body></html>`;

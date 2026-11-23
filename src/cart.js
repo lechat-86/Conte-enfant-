@@ -30,4 +30,4 @@ export function cartInfo(ctx) {
   const count = lines.reduce((a, l) => a + l.qty, 0);
   return { lines, subtotal, shipping, total: subtotal + shipping, count, notices };
 }
-export const cartCount = (ctx) => Object.values(ctx.session?.cart || {}).reduce((a, q) => a + (parseInt(q, 10) || 0), 0);
+export const cartCount = (ctx) => ctx.session?.cart?._shopify ? ctx.session.cart._count || 0 : Object.values(ctx.session?.cart || {}).reduce((a, q) => a + (parseInt(q, 10) || 0), 0);
