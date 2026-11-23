@@ -85,8 +85,12 @@ function uniqueSlug(name, ignoreId = 0) {
 }
 
 A('/admin/produits', (ctx) => {
-  const ps = db.prepare('SELECT p.*, c.name cat FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.deleted=0 ORDER BY p.created_at DESC').all();
+  const cats = db.prepare('SELECT id,name FROM categories ORDER BY position,id').all();
+  const f = ctx.query.cat === 'aucune' ? 'aucune' : cats.find((c) => String(c.id) === ctx.query.cat) ? ctx.query.cat : ctx.query.cat === 'coeur' ? 'coeur' : '';
+  const where = f === 'aucune' ? 'AND p.category_id IS NULL' : f === 'coeur' ? 'AND p.featured=1' : f ? 'AND p.category_id=?' : '';
+  const ps = db.prepare(`SELECT p.*, c.name cat FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.deleted=0 ${where} ORDER BY p.created_at DESC`).all(...(f && f !== 'aucune' && f !== 'coeur' ? [Number(f)] : []));
   adminPage(ctx, '/admin/produits', 'Produits', html`<p><a class="btn" href="/admin/produits/nouveau">+ Ajouter un produit</a></p>
+  <div class="filters"><a class="${!f ? 'on' : ''}" href="/admin/produits">Tous</a>${cats.map((c) => html`<a class="${f === String(c.id) ? 'on' : ''}" href="/admin/produits?cat=${c.id}">${c.name}</a>`)}<a class="${f === 'coeur' ? 'on' : ''}" href="/admin/produits?cat=coeur">♥ Coups de cœur</a><a class="${f === 'aucune' ? 'on' : ''}" href="/admin/produits?cat=aucune">Sans catégorie</a></div>
   ${ps.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th></th><th>Produit</th><th>Catégorie</th><th class="r">Prix</th><th class="r">Achat</th><th class="r">Marge</th><th class="r">Stock</th><th>État</th></tr></thead><tbody>
   ${ps.map((p) => html`<tr><td class="thumb-cell">${productImage(p)}</td><td><a class="link" href="/admin/produits/${p.id}"><b>${p.name}</b></a>${p.featured ? ' ♥' : ''}<br><small class="muted">${p.brand} ${p.size}</small></td><td>${p.cat || '—'}</td><td class="r">${eur(p.price_cents)}</td><td class="r">${eur(p.cost_cents)}</td><td class="r">${eur(p.price_cents - p.cost_cents)}</td>
    <td class="r">${p.stock <= 0 ? html`<b class="danger">0</b>` : p.stock <= p.low_stock ? html`<b class="warn">${p.stock}</b>` : p.stock}</td><td>${p.active ? html`<span class="pill st-paid">En ligne</span>` : html`<span class="pill st-pending">Masqué</span>`}</td></tr>`)}</tbody></table></div>`

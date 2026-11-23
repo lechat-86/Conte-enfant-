@@ -63,8 +63,8 @@ export function layout(ctx, { title, description = '', body, noindex = false, im
   const cats = db.prepare('SELECT slug,name FROM categories ORDER BY position,id').all();
   const flash = ctx.session.flash; if (flash) { ctx.session.flash = null; ctx.touch(); }
   const base = siteUrl(ctx);
-  const fullTitle = title ? `${title} — ${s.shop_name}` : `${s.shop_name} — Beauté, parfums & soins`;
-  const desc = description || 'Boutique en ligne de beauté : brumes et parfums, maquillage, soins visage et corps.';
+  const fullTitle = title ? `${title} — ${s.shop_name}` : `${s.shop_name} — Parfums, brumes & maquillage`;
+  const desc = description || 'Boutique en ligne : parfums, brumes, parfums de maison et maquillage.';
   const n = cartCount(ctx);
   const nav = html`<a href="/boutique">Boutique</a>${cats.map((c) => html`<a href="/categorie/${c.slug}">${c.name}</a>`)}<a href="/coups-de-coeur">Nos coups de cœur</a><a href="/a-propos">Notre univers</a><a href="/contact">Contact</a>`;
   return html`<!doctype html>
@@ -100,7 +100,7 @@ ${body}
 <footer class="footer">
   <div class="footer-in">
     <div class="footer-brand"><div class="brand">${wordmark()}</div>
-      <p>Brumes &amp; parfums, maquillage, soins visage et corps.</p>
+      <p>Parfums, brumes, parfums de maison et maquillage.</p>
       ${s.instagram || s.tiktok ? html`<p class="social">${s.instagram ? html`<a href="${s.instagram}" rel="noopener" target="_blank">Instagram</a>` : ''}${s.tiktok ? html`<a href="${s.tiktok}" rel="noopener" target="_blank">TikTok</a>` : ''}</p>` : ''}
     </div>
     <div><h4>Boutique</h4><ul>${cats.map((c) => html`<li><a href="/categorie/${c.slug}">${c.name}</a></li>`)}<li><a href="/coups-de-coeur">Nos coups de cœur</a></li></ul></div>

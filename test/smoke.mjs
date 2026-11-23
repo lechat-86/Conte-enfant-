@@ -40,10 +40,13 @@ const ok = (n) => console.log('  ✓', n);
 let failed = false;
 try {
   const c = new Client();
-  for (const u of ['/', '/boutique', '/coups-de-coeur', '/categorie/brumes-parfums', '/categorie/maquillage', '/recherche?q=prady', '/panier', '/contact', '/cgv', '/mentions-legales', '/livraison', '/retours', '/faq', '/confidentialite', '/a-propos', '/sitemap.xml', '/robots.txt', '/compte/connexion', '/css/style.css', '/favicon.svg'])
+  for (const u of ['/', '/boutique', '/coups-de-coeur', '/categorie/parfums', '/categorie/brumes', '/categorie/parfums-de-maison', '/categorie/maquillage', '/recherche?q=prady', '/panier', '/contact', '/cgv', '/mentions-legales', '/livraison', '/retours', '/faq', '/confidentialite', '/a-propos', '/sitemap.xml', '/robots.txt', '/compte/connexion', '/css/style.css', '/favicon.svg'])
     assert.equal((await c.req('GET', u)).status, 200, u);
   ok('pages publiques (200)');
   assert.match((await c.req('GET', '/')).text, /Nos coups de cœur/); assert.match((await c.req('GET', '/coups-de-coeur')).text, /Monoï Tiaré/); assert.doesNotMatch((await c.req('GET', '/')).text, /Nouveaut|Créations/); ok('rubrique Nos coups de cœur (sans Nouveautés ni Créations)');
+  const home = (await c.req('GET', '/')).text;
+  for (const n of ['Parfums', 'Brumes', 'Parfums de maison', 'Maquillage']) assert.match(home, new RegExp('class="cat-name">' + n + '<'));
+  assert.doesNotMatch(home, /Soins (visage|corps)/); assert.equal((await c.req('GET', '/categorie/soins-visage')).status, 404); ok('4 catégories officielles, plus de Soins visage / corps');
   assert.equal((await c.req('GET', '/page-inconnue')).status, 404); ok('404');
   assert.equal((await c.req('GET', '/admin')).status, 303); ok('admin protégé');
   assert.equal((await c.req('GET', '/uploads/../shop.db')).status, 404); assert.equal((await c.req('GET', '/..%2fsrc/db.js')).status, 404); ok('pas de traversée de dossier');
@@ -92,7 +95,7 @@ try {
   assert.equal((await admin.req('GET', '/admin/commandes/1/imprimer')).status, 200); ok('bon de préparation');
 
   // Produits & stocks
-  const np = await admin.req('POST', '/admin/produits/enregistrer', { _csrf: dt, name: 'Gloss Test', brand: 'Marque', category_id: 2, price: '7,50', cost: '2,10', stock: 5, low_stock: 2, active: '1', images: '[]' }); assert.equal(np.status, 303);
+  const np = await admin.req('POST', '/admin/produits/enregistrer', { _csrf: dt, name: 'Gloss Test', brand: 'Marque', category_id: 4, price: '7,50', cost: '2,10', stock: 5, low_stock: 2, active: '1', images: '[]' }); assert.equal(np.status, 303);
   assert.match((await c.req('GET', '/categorie/maquillage')).text, /Gloss Test/); ok('ajout d’un produit visible en boutique');
   await admin.req('POST', '/admin/stocks/ajuster', { _csrf: dt, product_id: 2, delta: '+10', reason: 'Réception fournisseur' });
   assert.match((await admin.req('GET', '/admin/stocks')).text, />15</); ok('ajustement de stock');

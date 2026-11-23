@@ -25,6 +25,12 @@ function pagination(ctx, total, page) {
   return html`<nav class="pager" aria-label="Pagination">${Array.from({ length: pages }, (_, i) => i + 1).map((n) => n === page ? html`<span aria-current="page">${n}</span>` : html`<a href="${link(n)}">${n}</a>`)}</nav>`;
 }
 
+function chips(path) {
+  const cats = db.prepare('SELECT slug,name FROM categories ORDER BY position,id').all();
+  const items = [['Tout voir', '/boutique'], ...cats.map((c) => [c.name, `/categorie/${c.slug}`]), ['♥ Nos coups de cœur', '/coups-de-coeur']];
+  return html`<nav class="chips" aria-label="Filtrer par catégorie">${items.map(([l, h]) => html`<a href="${h}" class="${h === path ? 'on' : ''}" ${h === path ? raw('aria-current="page"') : ''}>${l}</a>`)}</nav>`;
+}
+
 function listing(ctx, { where = '1=1', params = [], title, intro, crumbs, path }) {
   const sort = SORTS[ctx.query.tri] ? ctx.query.tri : 'nouveautes';
   const page = clampInt(ctx.query.page, 1, 999, 1);
@@ -34,6 +40,7 @@ function listing(ctx, { where = '1=1', params = [], title, intro, crumbs, path }
   return html`${pageHead(title, intro)}
   <section class="wrap section-sm">
     ${breadcrumb(crumbs)}
+    ${chips(path)}
     <div class="toolbar"><span class="muted">${total} produit${total > 1 ? 's' : ''}</span>
       <form method="get" action="${path}" class="sort"><label for="tri" class="sr">Trier</label>
         <select id="tri" name="tri" data-autosubmit>${Object.entries(SORTS).map(([k, [l]]) => html`<option value="${k}" ${k === sort ? raw('selected') : ''}>${l}</option>`)}</select>
@@ -53,9 +60,9 @@ route('GET', '/', (ctx) => {
   <section class="hero">
     <div class="hero-in wrap">
       <div class="hero-text">
-        <p class="eyebrow">Beauté · Parfums · Soins</p>
+        <p class="eyebrow">Beauté · Parfums · Maquillage</p>
         <h1>Révélez <em>votre éclat</em></h1>
-        <p class="lead">Brumes parfumées, maquillage et soins visage &amp; corps, sélectionnés auprès de fournisseurs européens.</p>
+        <p class="lead">Parfums, brumes, parfums de maison et maquillage, sélectionnés auprès de fournisseurs européens.</p>
         <p class="hero-cta"><a class="btn" href="/boutique">Découvrir la boutique</a><a class="btn btn-ghost" href="#categories">Nos univers</a></p>
       </div>
       <div class="hero-art" aria-hidden="true"><div class="arch arch-1"></div><div class="arch arch-2"></div><div class="orb"></div><span class="hero-mono">S<i>&amp;</i>G</span></div>
@@ -79,14 +86,14 @@ route('GET', '/', (ctx) => {
   <section class="section wrap narrow center">
     <p class="eyebrow">Notre univers</p>
     <h2 class="section-title">${s.shop_name}</h2>
-    <p class="lead-dark">Une boutique de beauté féminine, douce et élégante : des brumes et parfums, du maquillage et des soins pour sublimer votre quotidien. Chaque commande est préparée et expédiée avec soin.</p>
+    <p class="lead-dark">Une boutique de beauté féminine, douce et élégante : des parfums, des brumes, des parfums de maison et du maquillage pour sublimer votre quotidien. Chaque commande est préparée et expédiée avec soin.</p>
     <p><a class="link" href="/a-propos">En savoir plus</a></p>
   </section>` }));
 });
 
 /* ---------- Catalogue ---------- */
 route('GET', '/coups-de-coeur', (ctx) => ctx.html(layout(ctx, { title: 'Nos coups de cœur', description: 'Nos produits coups de cœur.', body: listing(ctx, { where: 'featured=1', title: 'Nos coups de cœur', intro: 'Les produits que nous aimons particulièrement', crumbs: [['Boutique', '/boutique'], ['Nos coups de cœur']], path: '/coups-de-coeur' }) })));
-route('GET', '/boutique', (ctx) => ctx.html(layout(ctx, { title: 'Boutique', description: 'Tous nos produits : brumes, parfums, maquillage et soins.', body: listing(ctx, { title: 'La boutique', intro: 'Tous nos produits', crumbs: [['Boutique']], path: '/boutique' }) })));
+route('GET', '/boutique', (ctx) => ctx.html(layout(ctx, { title: 'Boutique', description: 'Tous nos produits : parfums, brumes, parfums de maison et maquillage.', body: listing(ctx, { title: 'La boutique', intro: 'Tous nos produits', crumbs: [['Boutique']], path: '/boutique' }) })));
 route('GET', '/categorie/:slug', (ctx) => {
   const c = db.prepare('SELECT * FROM categories WHERE slug=?').get(ctx.params.slug);
   if (!c) return;
@@ -212,7 +219,7 @@ const info = (path, title, desc, render) => route('GET', path, (ctx) => ctx.html
 const N = (v, suffix = '') => (String(v || '').trim() ? html`${v}${suffix}` : todo(''));
 
 info('/a-propos', 'Notre univers', 'Découvrez SHAÏ & GLOW, boutique de beauté féminine et élégante.', (s) => html`
-  <p class="lead-dark">${s.shop_name} est une boutique en ligne de beauté : brumes et parfums, maquillage, soins visage et soins corps.</p>
+  <p class="lead-dark">${s.shop_name} est une boutique en ligne de beauté : parfums, brumes, parfums de maison et maquillage.</p>
   <p>Nous sélectionnons nos produits auprès de fournisseurs européens et préparons chaque commande nous-mêmes, avec soin, avant de l’expédier.</p>
   <p>Notre idée : une beauté simple, douce et accessible, pour se faire plaisir au quotidien.</p>
   <p><a class="btn" href="/boutique">Découvrir la boutique</a></p>`);

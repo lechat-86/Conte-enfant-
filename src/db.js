@@ -121,21 +121,34 @@ export function adjustStock(productId, delta, reason, orderId = null) {
   return balance;
 }
 
+/* ---------- Catégories officielles (appliquées une seule fois, ensuite modifiables dans l'admin) ---------- */
+const OFFICIAL_CATEGORIES = [
+  ['parfums', 'Parfums', 'Parfums et eaux de parfum.'],
+  ['brumes', 'Brumes', 'Brumes pour le corps et les cheveux.'],
+  ['parfums-de-maison', 'Parfums de maison', 'Parfumez votre intérieur.'],
+  ['maquillage', 'Maquillage', 'Teint, yeux, lèvres : le maquillage du quotidien.'],
+];
+function ensureCategories() {
+  if (db.prepare("SELECT 1 FROM settings WHERE key='categories_v2'").get()) return;
+  tx(() => {
+    // Ancienne catégorie « Brumes & Parfums » → « Brumes » (ses produits sont conservés)
+    db.prepare("UPDATE categories SET slug='brumes' WHERE slug='brumes-parfums' AND NOT EXISTS (SELECT 1 FROM categories WHERE slug='brumes')").run();
+    // Suppression de Soins visage / Soins corps (leurs produits éventuels passent « sans catégorie »)
+    db.prepare("DELETE FROM categories WHERE slug IN ('soins-visage','soins-corps')").run();
+    OFFICIAL_CATEGORIES.forEach(([slug, name, description], i) => {
+      if (db.prepare('SELECT 1 FROM categories WHERE slug=?').get(slug)) db.prepare('UPDATE categories SET name=?, description=?, position=? WHERE slug=?').run(name, description, i, slug);
+      else db.prepare('INSERT INTO categories(slug,name,description,position) VALUES(?,?,?,?)').run(slug, name, description, i);
+    });
+    db.prepare("INSERT INTO settings(key,value) VALUES('categories_v2','1')").run();
+  });
+}
+
 /* ---------- Données de départ (une seule fois) ---------- */
 function seed() {
   const now = Date.now();
-  if (!db.prepare('SELECT 1 FROM categories LIMIT 1').get()) {
-    const cats = [
-      ['Brumes & Parfums', 'Brumes corporelles, brumes cheveux et parfums.'],
-      ['Maquillage', 'Teint, yeux, lèvres : le maquillage du quotidien.'],
-      ['Soins visage', 'Nettoyer, hydrater, prendre soin de sa peau.'],
-      ['Soins corps', 'Hydratation et douceur pour le corps.'],
-    ];
-    cats.forEach(([name, description], i) =>
-      db.prepare('INSERT INTO categories(slug,name,description,position) VALUES(?,?,?,?)').run(slugify(name), name, description, i));
-  }
+  ensureCategories();
   if (!db.prepare('SELECT 1 FROM products LIMIT 1').get()) {
-    const cat = db.prepare('SELECT id FROM categories WHERE slug=?').get('brumes-parfums');
+    const cat = db.prepare('SELECT id FROM categories WHERE slug=?').get('brumes');
     tx(() => {
       const r = db.prepare(`INSERT INTO products(slug,name,brand,size,category_id,short_desc,description,price_cents,cost_cents,stock,low_stock,featured,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?)`).run(

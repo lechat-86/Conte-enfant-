@@ -1,6 +1,6 @@
 # SHAÏ & GLOW — boutique en ligne
 
-Boutique de beauté (brumes & parfums, maquillage, soins) : catalogue, panier, paiement Stripe, comptes clientes, espace d'administration (produits, stocks, commandes, réglages).
+Boutique de beauté (parfums, brumes, parfums de maison, maquillage) : catalogue, panier, paiement Stripe, comptes clientes, espace d'administration (produits, stocks, commandes, réglages).
 
 👉 **Tout est expliqué pas à pas dans [GUIDE.md](GUIDE.md).**
 
