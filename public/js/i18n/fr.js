@@ -38,6 +38,12 @@ export default {
   'demo.mode': 'Mode démonstration',
   'demo.mode_text': 'Données fictives · aucun envoi réel',
   'demo.chip': 'Prototype — données fictives',
+  'demo.chip_public': 'Démo publique · données fictives',
+  'demo.mode_text_public': 'Données fictives · analyse simulée · aucun envoi réel',
+  'public.strip': 'Démonstration publique : l’analyse documentaire est SIMULÉE (aucune IA ni OCR réels), aucun message n’est réellement envoyé et aucun fichier n’est lu. Ne saisissez aucune donnée réelle : tout reste dans votre navigateur.',
+  'settings.restore_disabled': 'La restauration de sauvegardes est désactivée dans la démonstration publique.',
+  'landing.footer_public': 'READYFILE AI — nom provisoire · démonstration publique, données fictives',
+  'portal.demo_notice_public': 'Démonstration : le dépôt est simulé (aucun fichier réel n’est envoyé, lu ni stocké) et l’analyse est simulée.',
 
   // Commun
   'common.language': 'Langue',

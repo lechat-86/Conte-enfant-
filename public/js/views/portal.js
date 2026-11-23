@@ -1,4 +1,5 @@
 // Portail client de démonstration : le client ne voit QUE son dossier (jeton) — jamais ceux des autres.
+import { isPublicDemo } from '../core/edition.js';
 import { h } from '../core/html.js';
 import { t } from '../core/i18n.js';
 import { fmtDate, fmtDateTime, fmtPeriod, fmtSize } from '../core/format.js';
@@ -39,7 +40,7 @@ export function render({ store, params }) {
       </div>
     </div>
 
-    <div class="note note-sim" role="note">${icon('info', 18)}<p>${t('portal.demo_notice')}</p></div>
+    <div class="note note-sim" role="note">${icon('info', 18)}<p>${t(isPublicDemo() ? 'portal.demo_notice_public' : 'portal.demo_notice')}</p></div>
 
     <section class="portal-test card">
       <label for="portal-scenario"><strong>${t('portal.test_scenario')}</strong><small class="block muted">${t('portal.test_hint')}</small></label>
@@ -60,9 +61,9 @@ export function render({ store, params }) {
         ${state === 'analyzing' ? h`<p class="small muted"><span class="spinner" aria-hidden="true"></span>${t('portal.analyzing')}</p>` : ''}
         ${state === 'valid' ? h`<p class="small ok-text">${icon('check', 14)} ${t('portal.valid_msg')}</p>` : ''}
         ${state === 'missing' || state === 'invalid' ? h`<div class="p-actions">
-          <label class="btn btn-primary btn-sm file-btn">${icon('upload', 14)}${state === 'invalid' ? t('portal.upload_new') : t('portal.upload')}
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" data-change="portal-file" data-dossier="${d.id}" data-slot="${s.id}"></label>
-          <button class="btn btn-sm" data-action="portal-fake" data-dossier="${d.id}" data-slot="${s.id}">${icon('file', 14)}${t('portal.fake_file')}</button>
+          ${isPublicDemo() ? '' : h`<label class="btn btn-primary btn-sm file-btn">${icon('upload', 14)}${state === 'invalid' ? t('portal.upload_new') : t('portal.upload')}
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" data-change="portal-file" data-dossier="${d.id}" data-slot="${s.id}"></label>`}
+          <button class="btn btn-sm ${isPublicDemo() ? 'btn-primary' : ''}" data-action="portal-fake" data-dossier="${d.id}" data-slot="${s.id}">${icon('file', 14)}${t('portal.fake_file')}</button>
         </div>` : ''}
       </li>`;
     })}</ul>
@@ -83,7 +84,7 @@ onChange({
   'portal-file': (el) => {
     const f = el.files?.[0];
     el.value = '';
-    if (!f) return;
+    if (!f || isPublicDemo()) return; // démo publique : aucun fichier réel n'est jamais lu, même nom ou taille
     if (!OK_EXT.test(f.name)) return toast(t('err.file_type'), 'error');
     if (f.size > MAX_MB * 1048576) return toast(t('err.file_size', { n: MAX_MB }), 'error');
     // Seuls le nom et la taille sont lus : le contenu du fichier n'est jamais lu, transmis ni stocké.

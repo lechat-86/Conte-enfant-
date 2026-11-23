@@ -35,7 +35,7 @@ public/
     ui/                      download.js (téléchargement local d'un fichier), composants, graphiques SVG/CSS, modales, toasts, icônes
     views/                   une vue par page (+ formulaires, assistant, landing, tour = démo guidée)
     app.js                   routeur par hash, coque, rendu
-tests/unit/                  191 tests ; tests/e2e/run.mjs : 44 tests navigateur
+tests/unit/                  199 tests ; tests/e2e/run.mjs : 44 tests navigateur ; tests/e2e/public.mjs : 13 tests (démo publique)
 ```
 
 **Règle de dépendance** : `domain` ← `engine` ← `data` ← `views/ui` ← `app`. `domain` n'importe jamais de `views`/`ui`/DOM (vérifié : les tests unitaires l'importent directement sous Node).
@@ -71,6 +71,14 @@ tests/unit/                  191 tests ; tests/e2e/run.mjs : 44 tests navigateur
 - **CSV** : une ligne par dossier + une ligne par client sans dossier ; UTF-8 avec BOM, fins de ligne CRLF, séparateur `;` (FR) ou `,` (EN), dates `AAAA-MM-JJ`, valeurs commençant par `= + - @` neutralisées (injection de formules).
 - **Indépendance** : seule la clé `readyfile-ai-demo` est lue/écrite ; un fichier d'une autre application est refusé.
 - **Limites** : le navigateur ne dit pas si le fichier téléchargé a réellement été enregistré par l'utilisateur ; la sauvegarde contient les données en clair (pas de chiffrement).
+
+## Démo publique (hébergement statique)
+
+- **Aucun serveur requis** : l'application n'est que HTML/CSS/JS (modules ES, routage par `#`, stockage `localStorage`). `scripts/build-demo-public.mjs` copie **uniquement** `public/` dans `DEMO-PUBLIC/`, ajoute `_headers` (mêmes règles CSP que `server.js` + `X-Frame-Options`, `noindex`…), `robots.txt`, et produit le ZIP (fichiers à la racine, dates fixes → build reproductible).
+- **Édition** : l'attribut `<html data-edition="public-demo">` (écrit par le build) active `core/edition.js#isPublicDemo()`. Sans lui (serveur local), rien ne change. En édition publique : pas de restauration de sauvegarde ni de sélecteur de fichier (et les gestionnaires correspondants refusent d'agir même si un champ était injecté), pas de page ni de section tarifs, bandeau permanent (`public.strip`), textes « démo publique ».
+- **Liens du portail** : construits avec `location.origin + location.pathname` → ils suivent automatiquement le domaine HTTPS de l'hébergement (testé sur un faux domaine HTTPS, jamais `localhost`).
+- **Isolation** : chaque navigateur a son propre `localStorage` (aucun serveur, aucune synchronisation). Les dossiers d'exemple ont des jetons fixes (`demo-dos-003`) et s'ouvrent partout ; un dossier créé par la démo guidée n'existe que dans son navigateur.
+- **Garde-fous testés** (`tests/unit/demo-public.test.js`) : liste blanche des fichiers livrés, absence de toute trace de l'outil interne, d'adresse locale, de secret et d'e-mail non fictif ; `DEMO-PUBLIC/` et le ZIP doivent correspondre au code source (sinon : `npm run build:demo`).
 
 ## Brancher un vrai moteur OCR / IA
 

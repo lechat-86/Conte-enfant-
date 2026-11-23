@@ -13,6 +13,8 @@
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:growth": "node tests/e2e/growth.mjs",
-    "test:all": "npm test && npm run test:e2e && npm run test:growth"
+    "test:all": "npm test && npm run test:e2e && npm run test:growth && npm run test:public",
+    "build:demo": "node scripts/build-demo-public.mjs",
+    "test:public": "node tests/e2e/public.mjs"
   }
 }

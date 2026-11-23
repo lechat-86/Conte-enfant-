@@ -35,12 +35,21 @@ Le serveur n'écoute que sur `127.0.0.1`. Les données de démonstration sont st
 7. **Paramètres → Sauvegarde et export** : téléchargez une sauvegarde JSON complète, restaurez-la (sauvegarde de l'état actuel obligatoire + confirmation explicite, aucune fusion) ou exportez le suivi en CSV pour Excel (`;` en FR, `,` en EN).
 8. Basculez **FR ↔ EN** à tout moment (sans rechargement).
 
+## Démo publique (site statique, Cloudflare Pages)
+
+```bash
+npm run build:demo   # génère DEMO-PUBLIC/ et LIVRAISON-DEMO/readyfile-demo-public.zip
+```
+
+`DEMO-PUBLIC/` = l'application seule (aucun serveur Node nécessaire en production), sans restauration de sauvegarde, sans sélection de fichier réel, sans page de tarifs, avec un bandeau permanent « analyse simulée / aucun envoi ». Guide de déploiement : [`LIVRAISON-DEMO/GUIDE-DEPLOIEMENT-CLOUDFLARE.md`](LIVRAISON-DEMO/GUIDE-DEPLOIEMENT-CLOUDFLARE.md). Captures pour le PDF commercial : `node scripts/capture-screenshots.mjs`.
+
 ## Tests
 
 ```bash
-npm test            # 191 tests unitaires (node:test) — logique métier, relances, sauvegarde/CSV, i18n, store, données
+npm test            # 199 tests unitaires (node:test) — logique métier, relances, sauvegarde/CSV, démo publique, i18n, store, données
 npm run test:e2e    # 44 tests navigateur (Playwright/Chromium déjà installé) — toutes pages, relances, sauvegarde/restauration/CSV, mobile, tablette
 npm run test:growth # 31 tests navigateur de l'outil interne GROWTH
+npm run test:public # 13 tests de la démo publique (site statique servi sur un faux domaine HTTPS, CSP appliquée)
 npm run test:all
 ```
 

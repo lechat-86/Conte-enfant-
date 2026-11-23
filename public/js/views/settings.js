@@ -9,6 +9,7 @@ import { toast } from '../ui/toast.js';
 import { openModal, closeModal, refreshModal } from '../ui/modals.js';
 import { fmtDate } from '../core/format.js';
 import { downloadFile } from '../ui/download.js';
+import { isPublicDemo } from '../core/edition.js';
 import { buildCsv, csvSeparator, parseBackup, summarize, MAX_BYTES } from '../domain/backup.js';
 
 let errors = {};
@@ -49,9 +50,10 @@ export function render({ store, state }) {
       ${backupError ? h`<p class="note note-error" role="alert" data-testid="backup-error">${icon('alert', 18)}<span>${backupErrorText(backupError)}</span></p>` : ''}
       <div class="btn-row">
         <button class="btn btn-primary" data-action="backup-download">${icon('download')}${t('settings.backup_download')}</button>
-        <label class="btn file-btn">${icon('upload')}${t('settings.backup_restore')}<input type="file" accept=".json,application/json" data-change="backup-file" aria-label="${t('backup.file_aria')}" data-testid="backup-file"></label>
+        ${isPublicDemo() ? '' : h`<label class="btn file-btn">${icon('upload')}${t('settings.backup_restore')}<input type="file" accept=".json,application/json" data-change="backup-file" aria-label="${t('backup.file_aria')}" data-testid="backup-file"></label>`}
         <button class="btn" data-action="csv-export">${icon('download')}${t('settings.csv_export')}</button>
       </div>
+      ${isPublicDemo() ? h`<p class="note note-sim" role="note" data-testid="restore-disabled">${icon('info', 18)}<span>${t('settings.restore_disabled')}</span></p>` : ''}
       <p class="hint">${t('settings.csv_hint', { sep: csvSeparator(getLang()), lang: getLang().toUpperCase() })}</p>
     </section>
     <section class="card">
@@ -163,7 +165,7 @@ onChange({
   async 'backup-file'(el) {
     const file = el.files?.[0];
     el.value = ''; // permet de re-sélectionner le même fichier
-    if (!file) return;
+    if (!file || isPublicDemo()) return; // démo publique : aucune restauration, aucun fichier n'est lu
     backupError = null;
     let result;
     if (file.size > MAX_BYTES) result = { ok: false, error: 'too_large' };

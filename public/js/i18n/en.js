@@ -37,6 +37,12 @@ export default {
   'demo.mode': 'Demo mode',
   'demo.mode_text': 'Fictional data · nothing is really sent',
   'demo.chip': 'Prototype — fictional data',
+  'demo.chip_public': 'Public demo · fictional data',
+  'demo.mode_text_public': 'Fictional data · simulated analysis · nothing is really sent',
+  'public.strip': 'Public demo: document analysis is SIMULATED (no real AI or OCR), no message is really sent and no file is read. Do not enter any real data: everything stays in your browser.',
+  'settings.restore_disabled': 'Restoring backups is disabled in the public demo.',
+  'landing.footer_public': 'READYFILE AI — working name · public demo, fictional data',
+  'portal.demo_notice_public': 'Demo: the upload is simulated (no real file is sent, read or stored) and the analysis is simulated.',
 
   'common.language': 'Language',
   'common.close': 'Close',

@@ -1,3 +1,4 @@
+import { isPublicDemo } from '../core/edition.js';
 import { h, raw } from '../core/html.js';
 import { t, getLang } from '../core/i18n.js';
 import { icon } from './icons.js';
@@ -72,6 +73,8 @@ export function langToggle() {
 }
 
 export function simBanner(textKey = 'sim.banner') {
+  // Démo publique : le bandeau permanent du haut (app.js) dit déjà l'essentiel ; on évite le doublon. Les notes spécifiques restent.
+  if (isPublicDemo() && (textKey === 'sim.banner' || textKey === 'sim.banner_short')) return '';
   return h`<div class="note note-sim" role="note">${icon('info', 18)}<p>${t(textKey)}</p></div>`;
 }
 

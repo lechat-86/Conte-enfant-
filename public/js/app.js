@@ -6,6 +6,7 @@ import { setRenderer, setStore, navigate } from './core/bus.js';
 import { createStore } from './data/store.js';
 import { icon, logoMark } from './ui/icons.js';
 import { langToggle } from './ui/components.js';
+import { isPublicDemo } from './core/edition.js';
 import { refreshModal, closeModal } from './ui/modals.js';
 import { needsIntervention, dossierStatus } from './domain/dossier.js';
 import * as dashboard from './views/dashboard.js';
@@ -22,7 +23,7 @@ import * as landing from './views/landing.js';
 import * as tour from './views/tour.js';
 
 const LANG_KEY = 'readyfile-lang';
-const routes = [
+const routesAll = [
   { re: /^\/$/, view: dashboard, nav: 'dashboard' },
   { re: /^\/clients$/, view: clients, nav: 'clients' },
   { re: /^\/clients\/([\w-]+)$/, keys: ['id'], view: clientDetail, nav: 'clients' },
@@ -35,7 +36,8 @@ const routes = [
   { re: /^\/portal\/([\w-]+)$/, keys: ['token'], view: portal, nav: null },
   { re: /^\/welcome$/, view: landing, nav: null },
 ];
-const NAV = [
+const PUBLIC_HIDDEN = new Set(['pricing']); // démo publique : pas de page de tarifs (hypothèses commerciales non validées, calculateur interne)
+const NAV_ALL = [
   ['dashboard', '/', 'dashboard'],
   ['clients', '/clients', 'users'],
   ['dossiers', '/dossiers', 'folder'],
@@ -44,6 +46,8 @@ const NAV = [
   ['pricing', '/pricing', 'tag'],
   ['settings', '/settings', 'settings'],
 ];
+const routes = isPublicDemo() ? routesAll.filter((r) => !PUBLIC_HIDDEN.has(r.nav)) : routesAll;
+const NAV = isPublicDemo() ? NAV_ALL.filter(([k]) => !PUBLIC_HIDDEN.has(k)) : NAV_ALL;
 
 const store = createStore();
 setStore(store);
@@ -80,6 +84,11 @@ function focusKey(el) {
   return sel;
 }
 
+/** Bandeau permanent de la démo publique : ce qui est simulé et ce qui n'est pas envoyé. */
+function publicStrip() {
+  return isPublicDemo() ? h`<div class="public-strip" role="note" data-testid="public-strip">${icon('info', 16)}<span>${t('public.strip')}</span></div>` : '';
+}
+
 function shell(content, { nav, attention }) {
   const sample = store.getState().dossiers.find((d) => dossierStatus(d) === 'to_fix') || store.getState().dossiers[0];
   return h`
@@ -90,18 +99,19 @@ function shell(content, { nav, attention }) {
         <div class="side-foot">
           <a class="nav-link" href="#/welcome">${icon('globe', 18)}<span>${t('nav.welcome')}</span></a>
           ${sample ? h`<a class="nav-link nav-portal" href="#/portal/${sample.token}">${icon('external', 18)}<span>${t('nav.portal_demo')}</span></a>` : ''}
-          <div class="demo-card"><span class="dot-live"></span><div><strong>${t('demo.mode')}</strong><small>${t('demo.mode_text')}</small></div></div>
+          <div class="demo-card"><span class="dot-live"></span><div><strong>${t('demo.mode')}</strong><small>${t(isPublicDemo() ? 'demo.mode_text_public' : 'demo.mode_text')}</small></div></div>
         </div>
       </aside>
       <div class="scrim" data-action="drawer-close"></div>
       <div class="main-col">
         <header class="topbar">
           <button class="icon-btn menu-btn" data-action="drawer-open" aria-label="${t('nav.open_menu')}">${icon('menu', 22)}</button>
-          <span class="chip chip-demo">${icon('shield', 14)}${t('demo.chip')}</span>
+          <span class="chip chip-demo">${icon('shield', 14)}${t(isPublicDemo() ? 'demo.chip_public' : 'demo.chip')}</span>
           <span class="grow"></span>
           <a class="icon-btn bell" href="#/dossiers?status=attention" aria-label="${t('nav.notifications')} : ${attention}" title="${t('nav.notifications')}">${icon('bell', 20)}${attention ? h`<span class="bell-n" data-testid="bell-count">${attention}</span>` : ''}</a>
           ${langToggle()}
         </header>
+        ${publicStrip()}
         <main id="main" tabindex="-1">${content}</main>
       </div>
     </div>`;
@@ -116,6 +126,7 @@ function portalShell(content) {
       <a class="btn btn-sm" href="#/dossiers">${icon('back', 14)}${t('portal.back_to_app')}</a>
       ${langToggle()}
     </header>
+    ${publicStrip()}
     <main id="main" class="portal-main" tabindex="-1">${content}</main>
   </div>`;
 }

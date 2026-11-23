@@ -8,6 +8,7 @@ import { SCENARIOS, simulateAnalysis } from '../engine/simulated.js';
 import { buildMessage } from '../domain/messages.js';
 import { monthOf, shiftMonths } from '../domain/period.js';
 import { PLANS, toUsd } from '../domain/pricing.js';
+import { isPublicDemo } from '../core/edition.js';
 import { onClick } from '../core/actions.js';
 import { rerender, navigate } from '../core/bus.js';
 
@@ -18,7 +19,7 @@ export function topbar() {
   return h`<header class="portal-top landing-top">
     <a class="brand brand-light" href="#/welcome">${logoMark(28)}<span><strong>READYFILE</strong><em>AI</em></span></a>
     <nav class="l-nav" aria-label="${t('nav.main')}">
-      ${[['problem', 'landing.nav_problem'], ['how', 'landing.nav_how'], ['demo', 'landing.nav_demo'], ['pricing', 'landing.nav_pricing']].map(([id, k]) => h`<button type="button" class="l-link" data-action="landing-scroll" data-target="l-${id}">${t(k)}</button>`)}
+      ${[['problem', 'landing.nav_problem'], ['how', 'landing.nav_how'], ['demo', 'landing.nav_demo'], ['pricing', 'landing.nav_pricing']].filter(([id]) => !(isPublicDemo() && id === 'pricing')).map(([id, k]) => h`<button type="button" class="l-link" data-action="landing-scroll" data-target="l-${id}">${t(k)}</button>`)}
     </nav>
     <span class="grow"></span>
     <a class="btn btn-sm" href="#/">${t('landing.open_app')}${icon('arrow', 14)}</a>
@@ -82,12 +83,12 @@ export function render({ store }) {
         ${demo(store)}
       </section>
 
-      <section class="l-section" id="l-pricing">
+      ${isPublicDemo() ? '' : h`<section class="l-section" id="l-pricing">
         <h2>${t('landing.pricing_title')}</h2>
         <div class="note note-warn" role="note">${icon('alert', 18)}<p>${t('landing.pricing_note')}</p></div>
         <div class="l-prices">${PLANS.map((p) => h`<div class="l-price ${p.highlight ? 'hl' : ''}"><strong>${t(`plan.${p.id}`)}</strong><span class="amt">${fmtMoney(p.eur, 'EUR')}<small>${t('pricing.per_month')}</small></span><span class="muted">≈ ${fmtMoney(toUsd(p.eur), 'USD')} (${t('pricing.indicative')})</span></div>`)}</div>
         <a class="link-more" href="#/pricing">${t('landing.pricing_more')}${icon('arrow', 14)}</a>
-      </section>
+      </section>`}
 
       <section class="l-section">
         <h2>${t('landing.limits_title')}</h2>
@@ -102,7 +103,7 @@ export function render({ store }) {
         <p>${t('landing.final_text')}</p>
         <button class="btn btn-primary btn-lg" data-action="tour-start">${icon('play')}${t('landing.cta_tour')}</button>
       </section>
-      <footer class="l-footer">${t('landing.footer')}</footer>
+      <footer class="l-footer">${t(isPublicDemo() ? 'landing.footer_public' : 'landing.footer')}</footer>
     </div>`;
 }
 

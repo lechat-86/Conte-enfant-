@@ -28,6 +28,7 @@
 | Tarifs et quotas | Hypothèses commerciales, pas des offres vendues |
 | Authentification / comptes / rôles | Inexistants ; le portail s'ouvre avec un jeton visible dans l'URL |
 | Multi-cabinet, isolation, chiffrement, purge, durée de conservation, journal d'accès, RGPD | **Non implémentés** (l'écran Paramètres les liste comme « Non implémenté ») ; la durée de conservation est un champ non appliqué |
+| Démo publique | Site statique : aucune donnée n'est envoyée à un serveur ; chaque visiteur a sa copie locale. Restauration de sauvegarde, sélection de fichier réel et tarifs désactivés. Cloudflare (hébergeur) peut journaliser les accès techniques |
 | Persistance | `localStorage` du navigateur (un seul poste, pas de synchronisation). La sauvegarde JSON permet de déplacer les données **à la main** ; ce n'est ni une synchronisation ni une sauvegarde automatique. Le navigateur ne confirme pas que le fichier téléchargé a bien été enregistré : on sait seulement que le téléchargement a été déclenché sans erreur |
 | Délai d'analyse (≈ 1,2 s) | Temporisation artificielle pour montrer l'état « en cours » |
 | Liens du portail | Fonctionnent uniquement dans le navigateur qui détient les données (copier le lien ailleurs ne marche pas) |

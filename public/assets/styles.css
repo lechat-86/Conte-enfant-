@@ -386,3 +386,8 @@ body.tour-on main#main { padding-bottom: 260px; } body.tour-on .landing { paddin
   .l-nav { display: none; } .l-hero { padding-top: 36px; }
 }
 @media (max-width: 520px) { .l-grid, .l-steps { grid-template-columns: 1fr; } .tour { bottom: 8px; padding: 12px 14px; } body.tour-on main#main, body.tour-on .landing { padding-bottom: 320px; } }
+
+/* Démo publique : bandeau permanent (simulation, aucun envoi) */
+.public-strip { display: flex; gap: 10px; align-items: flex-start; padding: 8px 20px; background: var(--info-tint); color: #17407f; font-size: 12.5px; line-height: 1.45; border-bottom: 1px solid rgba(23, 64, 127, .15); }
+.public-strip .ic { flex: none; margin-top: 2px; }
+@media (max-width: 720px) { .public-strip { padding: 8px 14px; } }
